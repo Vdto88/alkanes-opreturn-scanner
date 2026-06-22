@@ -3,3 +3,4 @@ cache/
 .env
 .env.*
 dist/
+*.log
