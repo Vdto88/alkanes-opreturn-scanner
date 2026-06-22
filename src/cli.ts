@@ -13,6 +13,7 @@ export interface CliOptions {
   subfrostKey?: string;
   sampleEvery: number;
   useCache: boolean;
+  concurrency?: number;
 }
 
 export function parseArgs(argv: string[]): CliOptions {
@@ -27,6 +28,7 @@ export function parseArgs(argv: string[]): CliOptions {
     else if (a === '--subfrost-key') o.subfrostKey = next();
     else if (a === '--sample') o.sampleEvery = Number(next());
     else if (a === '--no-cache') o.useCache = false;
+    else if (a === '--concurrency') o.concurrency = Number(next());
   }
   return o;
 }
@@ -46,7 +48,7 @@ function resolveKey(o: CliOptions): string | undefined {
 async function main(): Promise<void> {
   const o = parseArgs(process.argv.slice(2));
   const subfrostKey = resolveKey(o);
-  const esploraOpts = { source: o.source, subfrostKey };
+  const esploraOpts = { source: o.source, subfrostKey, concurrency: o.concurrency };
 
   let from = o.from;
   let to = o.to;

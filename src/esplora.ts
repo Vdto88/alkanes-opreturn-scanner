@@ -4,6 +4,8 @@ export interface EsploraOptions {
   source?: Source;
   subfrostKey?: string;
   fetchImpl?: typeof fetch;
+  /** páginas de tx buscadas em paralelo por bloco (default 8). */
+  concurrency?: number;
 }
 
 export interface EsploraTx {
@@ -11,61 +13,83 @@ export interface EsploraTx {
   vout: { scriptpubkey: string }[];
 }
 
-export function esploraBase(source: Source, subfrostKey?: string): string {
-  switch (source) {
-    case 'subfrost':
-      if (!subfrostKey) throw new Error('subfrostKey obrigatória para source subfrost');
-      return `https://mainnet.subfrost.io/v4/${subfrostKey}/esplora`;
-    case 'mempool':
-      return 'https://mempool.space/api';
-    case 'alkanode':
-      return 'https://api.alkanode.com';
-  }
+const REST_BASE: Record<'mempool' | 'alkanode', string> = {
+  mempool: 'https://mempool.space/api',
+  alkanode: 'https://api.alkanode.com',
+};
+
+/** path esplora ("/block/<h>/txs/0") -> método JSON-RPC do subfrost
+ *  ("esplora_block:<h>:txs:0"). O gateway subfrost expõe a superfície esplora
+ *  como JSON-RPC, não REST: a rota vira o nome do método (/ -> :). */
+export function pathToSubfrostMethod(path: string): string {
+  return 'esplora_' + path.replace(/^\//, '').replace(/\//g, ':');
 }
 
-/** Texto do GET com até 3 tentativas. Retry cobre HTTP transiente e o
- *  -32603 do gateway subfrost (vem no corpo). */
-async function fetchTextRetry(url: string, f: typeof fetch, attempts = 3): Promise<string> {
+/** Faz 1 request esplora e devolve o `result` parseado (number|string|object|array).
+ *  subfrost = JSON-RPC POST; mempool/alkanode = REST GET. Até 3 tentativas
+ *  (cobre HTTP transiente e o -32603 do gateway subfrost). */
+async function esploraRequest(path: string, opts: EsploraOptions, attempts = 3): Promise<unknown> {
+  const f = opts.fetchImpl ?? fetch;
+  const source = opts.source ?? 'subfrost';
   let lastErr: unknown;
+
   for (let i = 0; i < attempts; i++) {
     try {
-      const res = await f(url);
+      if (source === 'subfrost') {
+        if (!opts.subfrostKey) throw new Error('subfrostKey obrigatória para source subfrost');
+        const res = await f(`https://mainnet.subfrost.io/v4/${opts.subfrostKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 0, method: pathToSubfrostMethod(path), params: [] }),
+        });
+        const json = JSON.parse((await res.text()).trim()) as { result?: unknown; error?: { code: number } };
+        if (json.error) {
+          lastErr = new Error(`JSON-RPC ${json.error.code}`);
+          continue; // -32603 transiente -> retry
+        }
+        return json.result;
+      }
+      const res = await f(`${REST_BASE[source]}${path}`);
       const text = (await res.text()).trim();
-      if (!res.ok || text.includes('-32603')) {
-        lastErr = new Error(`HTTP ${res.status}: ${text.slice(0, 80)}`);
+      if (!res.ok) {
+        lastErr = new Error(`HTTP ${res.status}`);
         continue;
       }
-      return text;
+      try {
+        return JSON.parse(text);
+      } catch {
+        return text; // tip height / hash vêm como texto puro no REST
+      }
     } catch (e) {
       lastErr = e;
     }
   }
-  throw new Error(`fetch falhou ${url}: ${String(lastErr)}`);
-}
-
-function base(opts: EsploraOptions): string {
-  return esploraBase(opts.source ?? 'subfrost', opts.subfrostKey);
+  throw new Error(`esplora request falhou ${path}: ${String(lastErr)}`);
 }
 
 export async function tipHeight(opts: EsploraOptions = {}): Promise<number> {
-  const f = opts.fetchImpl ?? fetch;
-  return Number(await fetchTextRetry(`${base(opts)}/blocks/tip/height`, f));
+  return Number(await esploraRequest('/blocks/tip/height', opts));
 }
 
 export async function blockHash(height: number, opts: EsploraOptions = {}): Promise<string> {
-  const f = opts.fetchImpl ?? fetch;
-  return fetchTextRetry(`${base(opts)}/block-height/${height}`, f);
+  return String(await esploraRequest(`/block-height/${height}`, opts));
 }
 
 export async function blockTxs(hash: string, opts: EsploraOptions = {}): Promise<EsploraTx[]> {
-  const f = opts.fetchImpl ?? fetch;
-  const b = base(opts);
-  const info = JSON.parse(await fetchTextRetry(`${b}/block/${hash}`, f)) as { tx_count: number };
-  const out: EsploraTx[] = [];
-  for (let start = 0; start < info.tx_count; start += 25) {
-    const page = JSON.parse(await fetchTextRetry(`${b}/block/${hash}/txs/${start}`, f)) as EsploraTx[];
-    if (page.length === 0) break;
-    out.push(...page);
+  const info = (await esploraRequest(`/block/${hash}`, opts)) as { tx_count: number };
+  const starts: number[] = [];
+  for (let s = 0; s < (info.tx_count ?? 0); s += 25) starts.push(s);
+
+  // Páginas em paralelo (concorrência limitada); preserva a ordem via índice.
+  const pages: EsploraTx[][] = new Array(starts.length);
+  const concurrency = Math.max(1, opts.concurrency ?? 8);
+  let next = 0;
+  async function worker(): Promise<void> {
+    while (next < starts.length) {
+      const i = next++;
+      pages[i] = (await esploraRequest(`/block/${hash}/txs/${starts[i]}`, opts)) as EsploraTx[];
+    }
   }
-  return out;
+  await Promise.all(Array.from({ length: Math.min(concurrency, starts.length) }, worker));
+  return pages.flat();
 }
