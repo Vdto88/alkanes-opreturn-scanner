@@ -25,6 +25,15 @@ npm run scan -- --sample 100 --from 946000 --to 954000  # amostra 1 a cada 100
 Flags: `--blocks N` · `--from/--to H` · `--source subfrost|mempool|alkanode` (default subfrost) ·
 `--subfrost-key K` · `--sample K` · `--no-cache` · `--concurrency N`.
 
+### Gráfico / report HTML
+
+Depois de escanear (o cache fica em `./cache/`), gera um `report.html` standalone (série semanal
+de Alkanes, abre no navegador, sem servidor):
+
+```bash
+npx tsx tools/build-report.ts
+```
+
 ## Notas
 
 - **Fonte default = subfrost** (`mainnet.subfrost.io/v4/<key>`): é **JSON-RPC POST**, não REST —
