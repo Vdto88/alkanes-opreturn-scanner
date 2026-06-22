@@ -45,7 +45,10 @@ próprio. Importa o decode do v1 por **path relativo** — sem reimplementar pro
 ### Fonte de dados
 
 - **Provedor default: subfrost** (canônico, sem rate limit) via
-  `https://mainnet.subfrost.io/v4/<key>/esplora`. Gotcha `-32603` transiente → **retry resolve**.
+  `https://mainnet.subfrost.io/v4/<key>`. **Correção (descoberta na execução, 2026-06-22):** o
+  gateway subfrost é **JSON-RPC POST**, não REST — a superfície esplora vira método `esplora_` +
+  path com `/`→`:` (`esplora_blocks:tip:height`, `esplora_block:<hash>:txs:<start>`, …), `params:[]`.
+  Gotcha `-32603` transiente (vem em `error.code` no corpo) → **retry resolve**.
 - Alternativos via `--source`: `mempool` (`https://mempool.space/api`), `alkanode`.
 - **Key:** passada por `--subfrost-key` ou env `SUBFROST_KEY`; persistida só em `.env.local`
   (**gitignored**). **Nunca** commitar a key (cf. episódio da chave Stripe no changelog).
