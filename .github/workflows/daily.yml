@@ -42,6 +42,15 @@ jobs:
           mkdir -p public
           cp report.html public/index.html
           cp history.csv public/history.csv
+          cat > public/README.md <<'EOF'
+          # alkanes-opreturn-stats
+
+          Live dashboard: **https://vdto88.github.io/alkanes-opreturn-stats/**
+
+          Alkanes' share of Bitcoin OP_RETURN, updated daily. `history.csv` holds one
+          row per day. Built by the `alkanes-opreturn-scanner` (private), which reuses
+          `alkanes-opreturn-decoder` to classify each transaction (protocol_tag = 1).
+          EOF
 
       - name: Publish to public Pages repo
         uses: peaceiris/actions-gh-pages@v4

@@ -1,5 +1,7 @@
 # opreturn-scanner (v2)
 
+📊 **Dashboard ao vivo (atualizado diariamente):** https://vdto88.github.io/alkanes-opreturn-stats/
+
 Varre blocos de BTC e produz, de forma independente e defensável, as **3 métricas** de
 OP_RETURN/Alkanes (por **contagem** e por **bytes**):
 
