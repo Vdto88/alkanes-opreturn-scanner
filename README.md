@@ -25,14 +25,23 @@ npm run scan -- --sample 100 --from 946000 --to 954000  # amostra 1 a cada 100
 Flags: `--blocks N` · `--from/--to H` · `--source subfrost|mempool|alkanode` (default subfrost) ·
 `--subfrost-key K` · `--sample K` · `--no-cache` · `--concurrency N`.
 
-### Gráfico / report HTML
+### Histórico diário + gráfico
 
-Depois de escanear (o cache fica em `./cache/`), gera um `report.html` standalone (série semanal
-de Alkanes, abre no navegador, sem servidor):
+`history.csv` guarda **uma linha por dia** (agregado dos blocos daquele dia). É o registro durável.
 
 ```bash
-npx tsx tools/build-report.ts
+npx tsx tools/snapshot.ts        # escaneia os blocos recentes e grava/atualiza a linha de HOJE
+npx tsx tools/build-report.ts    # gera report.html (rollups ontem/7d/30d + linha do tempo diária)
+npx tsx tools/seed-history.ts    # (1x) semeia o history.csv a partir do cache local
 ```
+
+`report.html` é standalone (abre no navegador, sem servidor).
+
+### Automação (GitHub Actions)
+
+`.github/workflows/daily.yml` roda **todo dia** (cron) ou no botão "Run workflow": clona o decoder
+público, escaneia, atualiza `history.csv` + `report.html` e commita de volta. Requer **1 secret**
+no repo: `SUBFROST_KEY`. (Sem key, troque para `--source mempool` no workflow — público, keyless.)
 
 ## Notas
 

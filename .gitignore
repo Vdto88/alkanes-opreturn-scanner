@@ -4,5 +4,3 @@ cache/
 .env.*
 dist/
 *.log
-report.html
-series.json
