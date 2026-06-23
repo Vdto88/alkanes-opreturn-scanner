@@ -37,6 +37,21 @@ jobs:
       - name: Build report
         run: npx tsx tools/build-report.ts
 
+      - name: Stage Pages content
+        run: |
+          mkdir -p public
+          cp report.html public/index.html
+          cp history.csv public/history.csv
+
+      - name: Publish to public Pages repo
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          deploy_key: ${{ secrets.PAGES_DEPLOY_KEY }}
+          external_repository: Vdto88/alkanes-opreturn-stats
+          publish_branch: main
+          publish_dir: ./public
+          force_orphan: true
+
       - name: Commit history + report
         run: |
           git config user.name "github-actions[bot]"
