@@ -20,12 +20,12 @@
   @media(max-width:560px){.row{grid-template-columns:1fr}}
 </style></head><body>
 <h1>Alkanes' share of Bitcoin OP_RETURN</h1>
-<p class="sub">Apr 23 – Jun 23 · 62 days · 676,275 transactions · updated daily</p>
+<p class="sub">Apr 24 – Jun 23 · 61 days · 12,797,972 transactions · updated daily</p>
 <div class="cards">
-  <div class="card"><div class="l">Latest day</div><div class="v">83.7%</div><div class="b">97.8% of bytes</div></div>
-  <div class="card"><div class="l">Last 7 days</div><div class="v">71.9%</div><div class="b">97% of bytes</div></div>
-  <div class="card"><div class="l">Last 30 days</div><div class="v">68.7%</div><div class="b">96.4% of bytes</div></div>
-  <div class="card"><div class="l">All time</div><div class="v">65.5%</div><div class="b">95.4% of bytes</div></div>
+  <div class="card"><div class="l">Latest day</div><div class="v">72%</div><div class="b">97.1% of bytes</div></div>
+  <div class="card"><div class="l">Last 7 days</div><div class="v">67.8%</div><div class="b">96.3% of bytes</div></div>
+  <div class="card"><div class="l">Last 30 days</div><div class="v">60.9%</div><div class="b">94.9% of bytes</div></div>
+  <div class="card"><div class="l">All time</div><div class="v">56.5%</div><div class="b">92.2% of bytes</div></div>
 </div>
 <h2>Daily Alkanes share</h2>
 <div class="legend"><span><span class="sw" style="background:var(--teal)"></span>OP_RETURN bytes — 7-day avg</span><span><span class="sw" style="background:var(--purple)"></span>Transactions — 7-day avg</span><span><span class="sw" style="background:#4a4658"></span>Transactions — daily</span></div>
@@ -49,7 +49,7 @@
 <footer>Source data: <a href="./history.csv">history.csv</a> (one row per day). Bytes = full output script; coinbase included. Auto-updated daily from the alkanes-opreturn-scanner.</footer>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-const D={"labels":["Apr 23","Apr 24","Apr 25","Apr 26","Apr 27","Apr 28","Apr 29","Apr 30","May 1","May 2","May 3","May 4","May 5","May 6","May 7","May 8","May 9","May 10","May 11","May 12","May 13","May 14","May 15","May 16","May 17","May 18","May 19","May 20","May 21","May 22","May 23","May 24","May 25","May 26","May 27","May 28","May 29","May 30","May 31","Jun 1","Jun 2","Jun 3","Jun 4","Jun 5","Jun 6","Jun 7","Jun 8","Jun 9","Jun 10","Jun 11","Jun 12","Jun 13","Jun 14","Jun 15","Jun 16","Jun 17","Jun 18","Jun 19","Jun 20","Jun 21","Jun 22","Jun 23"],"txDaily":[4.7,1.6,32.6,98.7,76.7,62.4,78.4,13,1.8,71,4.6,86.8,54.6,51.5,43.2,66.1,78.5,1.8,63.4,98,76.2,11.9,69.7,62.5,29.8,90.5,39.3,78,89.1,53.3,49.7,12.8,76.3,95.6,93.7,69.4,13.6,73.7,32,54.9,10.7,58.7,52.6,67.6,14.3,50,71.1,56.5,38.7,32.1,35.4,71.7,72.3,93.7,57.7,34.8,72.8,67.3,95.4,90.7,70.9,83.7],"txRoll":[4.7,3.2,19.3,42.9,49.4,52.9,55.9,55.1,56.5,64.1,54,55.8,53.7,50.1,53.4,57.5,59.5,56.8,54.6,60.6,62.9,58.4,58.8,55.7,59,65.6,59,61.2,71.9,70.9,69.1,70.9,66.8,72.9,77.3,75,71.6,75.5,74.5,70.4,63.9,54.2,52.2,58,50.3,51.6,54.6,57.4,53.4,51.3,44.8,50.4,54.7,57.2,57.3,56.3,60.5,65.6,69,73,70.8,71.9],"bytesRoll":[25.1,24.5,68.6,87.2,89,90.9,91.8,92.4,92.8,95,91.7,92.3,91.6,90.6,90.1,90.8,91.5,92.5,92.6,94,94.3,95.2,95.2,93.5,93.7,94.7,92.7,92.9,94.4,94.2,94.7,94.8,94.1,95.8,97,96.7,96.5,97,96.8,96.3,95.3,93.5,93.3,94.4,93,93.5,94.3,94.9,93.7,93,91,92.4,93.5,93.5,93.6,94.1,94.9,95.9,96.3,96.8,96.9,97],"donutAlk":95.4,"span":"Apr 23 – Jun 23","days":62,"totalTx":676275};
+const D={"labels":["Apr 24","Apr 25","Apr 26","Apr 27","Apr 28","Apr 29","Apr 30","May 1","May 2","May 3","May 4","May 5","May 6","May 7","May 8","May 9","May 10","May 11","May 12","May 13","May 14","May 15","May 16","May 17","May 18","May 19","May 20","May 21","May 22","May 23","May 24","May 25","May 26","May 27","May 28","May 29","May 30","May 31","Jun 1","Jun 2","Jun 3","Jun 4","Jun 5","Jun 6","Jun 7","Jun 8","Jun 9","Jun 10","Jun 11","Jun 12","Jun 13","Jun 14","Jun 15","Jun 16","Jun 17","Jun 18","Jun 19","Jun 20","Jun 21","Jun 22","Jun 23"],"txDaily":[49,31.1,50.4,63.1,41.8,40.1,13.8,15.1,48.5,50.8,56.9,53.8,54.5,49.9,49.1,49.3,14.1,65.2,70.9,58.6,49.6,64.7,52.3,62.5,70.5,56.4,55.2,62.2,48.7,64.9,61.2,67.4,64.9,67.8,55,59.5,66.6,57.7,61.8,58.1,41.4,39.5,56.2,48.1,55.3,58.4,53.5,53.9,55.7,60.3,58.3,71.3,59.7,69.9,56.9,66.3,65.1,72.3,71.4,70.3,72],"txRoll":[49,34.5,41.8,49.6,47.8,46.4,42.4,39.3,41.7,41.7,39.8,41.7,43.9,48.3,52,52,45.7,47.4,50.2,50.8,50.8,53,53.4,60.8,61.6,59.4,59,60.7,58.5,60.3,60.1,59.7,60.9,62.7,61.7,63.1,63.3,62.8,62,61.1,57.5,55.6,55.1,52.3,51.9,51.3,50.6,52.4,54.5,55.1,56.5,59,59.2,61.7,62.1,63.5,64.2,66.1,66.1,67.6,67.8],"bytesRoll":[84.6,78.3,82.5,86.3,85.3,85.2,83.5,82.1,84,80.8,78.9,81,82.4,85.1,86.8,85.3,88.1,90.1,90.9,90.9,90.6,91.4,92.8,93.1,93,91.8,91.1,91.7,91.2,92.2,92.4,92.4,93.5,94.5,94.5,94.7,94.6,94.7,94.7,94.7,94.1,93.7,93.7,93.2,93,92.8,92.6,93.1,93.7,94,94.4,94.9,94.9,95.4,95.5,95.7,95.8,96.1,96,96.2,96.3],"donutAlk":92.2,"span":"Apr 24 – Jun 23","days":61,"totalTx":12797972};
 Chart.defaults.color='#9a9aa3'; Chart.defaults.font.family='system-ui,sans-serif';
 const pc=v=>v+'%', grid='rgba(255,255,255,0.07)';
 new Chart(g,{type:'line',data:{labels:D.labels,datasets:[
