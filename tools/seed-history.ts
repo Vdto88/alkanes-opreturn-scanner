@@ -30,12 +30,12 @@ for (const b of blocks) {
   const date = dateOf(b.height);
   const a = b.aggregate;
   const r = byDate.get(date) ?? {
-    date, fromHeight: b.height, toHeight: b.height, blocks: 0,
+    date, fromHeight: b.height, toHeight: b.height, blocksScanned: 0,
     totalTx: 0, txWithOpReturn: 0, txAlkanes: 0, opReturnBytes: 0, alkanesBytes: 0,
   };
   r.fromHeight = Math.min(r.fromHeight, b.height);
   r.toHeight = Math.max(r.toHeight, b.height);
-  r.blocks += 1;
+  r.blocksScanned += 1;
   r.totalTx += a.totalTx;
   r.txWithOpReturn += a.txWithOpReturn;
   r.txAlkanes += a.txAlkanes;

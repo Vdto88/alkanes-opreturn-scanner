@@ -21,7 +21,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const mday = (iso: string) => { const [, m, d] = iso.split('-'); return `${MONTHS[+m - 1]} ${+d}`; };
 
 const sumsOfRow = (r: HistoryRow): Sums => ({
-  blocks: r.blocks, totalTx: r.totalTx, txWithOpReturn: r.txWithOpReturn,
+  blocksScanned: r.blocksScanned, totalTx: r.totalTx, txWithOpReturn: r.txWithOpReturn,
   txAlkanes: r.txAlkanes, opReturnBytes: r.opReturnBytes, alkanesBytes: r.alkanesBytes,
 });
 
@@ -95,7 +95,7 @@ const html = `<!doctype html>
       <p>We read every Bitcoin block in the window and inspect each transaction's outputs. An output whose script starts with <code>6a</code> is an <b>OP_RETURN</b>; one starting <code>6a5d</code> is a Runestone.</p>
       <p>We decode the Runestone and if any protostone carries <b>protocol_tag = 1</b>, the transaction is <b>Alkanes</b>.</p>
       <p><b>Share of transactions</b> = Alkanes tx ÷ all tx. <b>Share of OP_RETURN bytes</b> = Alkanes OP_RETURN bytes ÷ all OP_RETURN bytes (the data-volume view, steadier).</p>
-      <p>Daily points come from a sample of each day's blocks, so thin days are noisy; the <b>7-day average</b> and the cards above aggregate many blocks and show the real trend. Classification reuses the open-source <a href="https://github.com/Vdto88/alkanes-opreturn-decoder">alkanes-opreturn-decoder</a>.</p>
+      <p>Each daily point is a <b>sample</b> of that day's ~144 blocks (see <code>blocksScanned</code> in the CSV), not all of them — so a thin day swings a lot. The <b>7-day average</b> and the cards aggregate many blocks and show the real trend. Classification reuses the open-source <a href="https://github.com/Vdto88/alkanes-opreturn-decoder">alkanes-opreturn-decoder</a>.</p>
     </div>
   </div>
 </div>

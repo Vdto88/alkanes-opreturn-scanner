@@ -41,7 +41,7 @@ const row: HistoryRow = {
   date: utcDate(0),
   fromHeight: from,
   toHeight: tip,
-  blocks: result.coverage.blocksScanned,
+  blocksScanned: result.coverage.blocksScanned,
   totalTx: a.totalTx,
   txWithOpReturn: a.txWithOpReturn,
   txAlkanes: a.txAlkanes,

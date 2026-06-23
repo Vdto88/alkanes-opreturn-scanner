@@ -7,7 +7,7 @@ export interface HistoryRow {
   date: string; // YYYY-MM-DD (UTC)
   fromHeight: number;
   toHeight: number;
-  blocks: number;
+  blocksScanned: number; // blocos AMOSTRADOS naquele dia (≠ os ~144 que existiram)
   totalTx: number;
   txWithOpReturn: number;
   txAlkanes: number;
@@ -16,7 +16,7 @@ export interface HistoryRow {
 }
 
 const COLS: (keyof HistoryRow)[] = [
-  'date', 'fromHeight', 'toHeight', 'blocks', 'totalTx', 'txWithOpReturn', 'txAlkanes', 'opReturnBytes', 'alkanesBytes',
+  'date', 'fromHeight', 'toHeight', 'blocksScanned', 'totalTx', 'txWithOpReturn', 'txAlkanes', 'opReturnBytes', 'alkanesBytes',
 ];
 
 export function readHistory(path: string): HistoryRow[] {
@@ -47,15 +47,15 @@ export function upsert(rows: HistoryRow[], row: HistoryRow): HistoryRow[] {
 }
 
 export interface Sums {
-  blocks: number; totalTx: number; txWithOpReturn: number; txAlkanes: number; opReturnBytes: number; alkanesBytes: number;
+  blocksScanned: number; totalTx: number; txWithOpReturn: number; txAlkanes: number; opReturnBytes: number; alkanesBytes: number;
 }
 
 /** Soma as linhas com date >= sinceDate (inclusive). */
 export function rollup(rows: HistoryRow[], sinceDate: string): Sums {
-  const s: Sums = { blocks: 0, totalTx: 0, txWithOpReturn: 0, txAlkanes: 0, opReturnBytes: 0, alkanesBytes: 0 };
+  const s: Sums = { blocksScanned: 0, totalTx: 0, txWithOpReturn: 0, txAlkanes: 0, opReturnBytes: 0, alkanesBytes: 0 };
   for (const r of rows) {
     if (r.date < sinceDate) continue;
-    s.blocks += r.blocks; s.totalTx += r.totalTx; s.txWithOpReturn += r.txWithOpReturn;
+    s.blocksScanned += r.blocksScanned; s.totalTx += r.totalTx; s.txWithOpReturn += r.txWithOpReturn;
     s.txAlkanes += r.txAlkanes; s.opReturnBytes += r.opReturnBytes; s.alkanesBytes += r.alkanesBytes;
   }
   return s;

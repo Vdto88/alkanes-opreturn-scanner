@@ -1,0 +1,80 @@
+name: dense backfill (one-off)
+
+on:
+  workflow_dispatch:
+    inputs:
+      blocks:
+        description: "Quantos blocos recentes abranger"
+        default: "8640"
+      sample:
+        description: "Escanear 1 a cada N blocos (3 ≈ 48/dia)"
+        default: "3"
+      concurrency:
+        description: "Páginas em paralelo por bloco"
+        default: "20"
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Checkout scanner
+        uses: actions/checkout@v4
+
+      - name: Clone decoder (sibling público)
+        run: git clone --depth 1 https://github.com/Vdto88/alkanes-opreturn-decoder.git ../opreturn-decoder
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: npm install --no-audit --no-fund
+
+      - name: Dense scan (popula o cache)
+        env:
+          SUBFROST_KEY: ${{ secrets.SUBFROST_KEY }}
+        run: npx tsx src/cli.ts --blocks ${{ inputs.blocks }} --sample ${{ inputs.sample }} --concurrency ${{ inputs.concurrency }}
+
+      - name: Rebuild history.csv from cache
+        run: npx tsx tools/seed-history.ts
+
+      - name: Build report
+        run: npx tsx tools/build-report.ts
+
+      - name: Stage Pages content
+        run: |
+          mkdir -p public
+          cp report.html public/index.html
+          cp history.csv public/history.csv
+          cat > public/README.md <<'EOF'
+          # alkanes-opreturn-stats
+
+          Live dashboard: **https://vdto88.github.io/alkanes-opreturn-stats/**
+
+          Alkanes' share of Bitcoin OP_RETURN, updated daily. `history.csv` holds one
+          row per day. Built by the `alkanes-opreturn-scanner` (private), which reuses
+          `alkanes-opreturn-decoder` to classify each transaction (protocol_tag = 1).
+          EOF
+
+      - name: Publish to public Pages repo
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          deploy_key: ${{ secrets.PAGES_DEPLOY_KEY }}
+          external_repository: Vdto88/alkanes-opreturn-stats
+          publish_branch: main
+          publish_dir: ./public
+          force_orphan: true
+
+      - name: Commit history + report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add history.csv report.html
+          git diff --cached --quiet || git commit -m "chore: dense backfill (sample ${{ inputs.sample }})"
+          git pull --rebase --autostash origin master || true
+          git push
