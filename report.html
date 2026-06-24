@@ -2,60 +2,62 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Alkanes — share of Bitcoin OP_RETURN</title>
 <style>
-  :root{--bg:#0b0b0d;--surface:#16161a;--line:#26262c;--text:#ececef;--head:#f6f6f8;--muted:#9a9aa3;--faint:#6f6f78;--teal:#2DBE8E;--purple:#9d94e8}
+  :root{--bg:#0b0b0d;--surface:#16161a;--line:#26262c;--text:#ececef;--head:#f6f6f8;--muted:#9a9aa3;--faint:#6f6f78;--teal:#2DBE8E;--purple:#9d94e8;--amber:#E9A23B}
   *{box-sizing:border-box} body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);max-width:880px;margin:0 auto;padding:2.5rem 1.25rem 3rem;line-height:1.6}
   h1{font-weight:600;font-size:23px;margin:0 0 4px;color:var(--head)} h2{font-weight:600;font-size:16px;margin:2.25rem 0 4px;color:var(--head)}
   .sub{color:var(--muted);font-size:13px;margin:0 0 1.5rem}
-  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:1.25rem 0 1.75rem}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:1.25rem 0 1rem}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1rem 1.1rem}
   .card .l{font-size:13px;color:var(--muted)} .card .v{font-size:27px;font-weight:600;color:var(--head);margin-top:2px} .card .b{font-size:12px;color:var(--faint);margin-top:2px}
+  .note{font-size:13px;color:var(--muted);margin:.25rem 0 0} .note b{color:var(--head);font-weight:600}
   .legend{display:flex;flex-wrap:wrap;gap:16px;margin:8px 0 10px;font-size:12px;color:var(--muted);align-items:center}
   .sw{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:middle}
   .wrap{position:relative;width:100%;height:300px;margin-bottom:1.5rem}
-  .row{display:grid;grid-template-columns:3fr 2fr;gap:28px;align-items:start}
-  .how{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.1rem 1.25rem;margin-top:1.5rem}
+  .how{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.1rem 1.25rem;margin-top:.5rem}
   .how p{margin:0 0 .6rem;font-size:14px;color:var(--text)} .how p:last-child{margin-bottom:0} .how b{color:var(--head);font-weight:600}
   code{font-family:ui-monospace,monospace;background:#222228;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12px;color:#d6d6db}
   a{color:var(--teal)} footer{margin-top:2rem;font-size:12px;color:var(--faint);border-top:1px solid var(--line);padding-top:1rem}
-  @media(max-width:560px){.row{grid-template-columns:1fr}}
 </style></head><body>
 <h1>Alkanes' share of Bitcoin OP_RETURN</h1>
-<p class="sub">Apr 24 – Jun 23 · 61 days · 12,797,972 transactions · updated daily</p>
+<p class="sub">Apr 24 – Jun 24 · 62 days · 12,919,752 transactions sampled · updated daily</p>
 <div class="cards">
-  <div class="card"><div class="l">Latest day</div><div class="v">72%</div><div class="b">97.1% of bytes</div></div>
-  <div class="card"><div class="l">Last 7 days</div><div class="v">67.8%</div><div class="b">96.3% of bytes</div></div>
-  <div class="card"><div class="l">Last 30 days</div><div class="v">60.9%</div><div class="b">94.9% of bytes</div></div>
-  <div class="card"><div class="l">All time</div><div class="v">56.5%</div><div class="b">92.2% of bytes</div></div>
+  <div class="card"><div class="l">Latest day</div><div class="v">75.3%</div><div class="b">97.4% of bytes</div></div>
+  <div class="card"><div class="l">Last 7 days</div><div class="v">69.9%</div><div class="b">96.6% of bytes</div></div>
+  <div class="card"><div class="l">Last 30 days</div><div class="v">61%</div><div class="b">95% of bytes</div></div>
+  <div class="card"><div class="l">All time</div><div class="v">56.7%</div><div class="b">92.2% of bytes</div></div>
 </div>
+<p class="note">Of all Alkanes activity, <b>1.2%</b> is DIESEL minting (cellpack <code>2:0</code> op&nbsp;77) — roughly <b>9,378</b> mints/day estimated over the last 30 days.</p>
+
 <h2>Daily Alkanes share</h2>
-<div class="legend"><span><span class="sw" style="background:var(--teal)"></span>OP_RETURN bytes — 7-day avg</span><span><span class="sw" style="background:var(--purple)"></span>Transactions — 7-day avg</span><span><span class="sw" style="background:#4a4658"></span>Transactions — daily</span></div>
+<div class="legend"><span><span class="sw" style="background:var(--teal)"></span>OP_RETURN bytes</span><span><span class="sw" style="background:var(--purple)"></span>Transactions</span></div>
 <div class="wrap"><canvas id="g"></canvas></div>
-<div class="row">
-  <div>
-    <h2 style="margin-top:0">OP_RETURN bytes (all time)</h2>
-    <div class="legend"><span><span class="sw" style="background:var(--teal)"></span>Alkanes</span><span><span class="sw" style="background:#3a3a42"></span>Everything else</span></div>
-    <div class="wrap" style="height:210px"><canvas id="d"></canvas></div>
-  </div>
-  <div>
-    <h2 style="margin-top:0">How it's calculated</h2>
-    <div class="how">
-      <p>We read every Bitcoin block in the window and inspect each transaction's outputs. An output whose script starts with <code>6a</code> is an <b>OP_RETURN</b>; one starting <code>6a5d</code> is a Runestone.</p>
-      <p>We decode the Runestone and if any protostone carries <b>protocol_tag = 1</b>, the transaction is <b>Alkanes</b>.</p>
-      <p><b>Share of transactions</b> = Alkanes tx ÷ all tx. <b>Share of OP_RETURN bytes</b> = Alkanes OP_RETURN bytes ÷ all OP_RETURN bytes (the data-volume view, steadier).</p>
-      <p>Each daily point is a <b>sample</b> of that day's ~144 blocks (see <code>blocksScanned</code> in the CSV), not all of them — so a thin day swings a lot. The <b>7-day average</b> and the cards aggregate many blocks and show the real trend. Classification reuses the open-source <a href="https://github.com/Vdto88/alkanes-opreturn-decoder">alkanes-opreturn-decoder</a>.</p>
-    </div>
-  </div>
+
+<h2>DIESEL mints — share of all Bitcoin transactions</h2>
+<div class="legend"><span><span class="sw" style="background:var(--amber)"></span>DIESEL mints (% of all tx)</span></div>
+<div class="wrap" style="height:240px"><canvas id="m"></canvas></div>
+
+<h2>OP_RETURN bytes (all time)</h2>
+<div class="legend"><span><span class="sw" style="background:var(--teal)"></span>Alkanes 92.2%</span><span><span class="sw" style="background:var(--amber)"></span>Runes 0%</span><span><span class="sw" style="background:#4a4a52"></span>Other 98.8%</span></div>
+<div class="wrap" style="height:230px;max-width:360px"><canvas id="d"></canvas></div>
+
+<h2>How it's calculated</h2>
+<div class="how">
+  <p>We read every Bitcoin block in the window and inspect each transaction's outputs. An output whose script starts with <code>6a</code> is an <b>OP_RETURN</b>; one starting <code>6a5d</code> is a Runestone.</p>
+  <p>We decode the Runestone and if any protostone carries <b>protocol_tag = 1</b>, the transaction is <b>Alkanes</b>. A <b>DIESEL mint</b> is the specific case where the cellpack targets <code>2:0</code> with opcode <code>77</code> (the genesis alkane) — today that's the vast majority of all Alkanes activity.</p>
+  <p><b>Share of transactions</b> = matching tx ÷ all tx. <b>Share of OP_RETURN bytes</b> = Alkanes OP_RETURN bytes ÷ all OP_RETURN bytes. Shares are unaffected by sampling; each day rests on ~24-48 sampled blocks (see <code>blocksScanned</code> in the CSV). Classification reuses the open-source <a href="https://github.com/Vdto88/alkanes-opreturn-decoder">alkanes-opreturn-decoder</a>.</p>
 </div>
 <footer>Source data: <a href="./history.csv">history.csv</a> (one row per day). Bytes = full output script; coinbase included. Auto-updated daily from the alkanes-opreturn-scanner.</footer>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-const D={"labels":["Apr 24","Apr 25","Apr 26","Apr 27","Apr 28","Apr 29","Apr 30","May 1","May 2","May 3","May 4","May 5","May 6","May 7","May 8","May 9","May 10","May 11","May 12","May 13","May 14","May 15","May 16","May 17","May 18","May 19","May 20","May 21","May 22","May 23","May 24","May 25","May 26","May 27","May 28","May 29","May 30","May 31","Jun 1","Jun 2","Jun 3","Jun 4","Jun 5","Jun 6","Jun 7","Jun 8","Jun 9","Jun 10","Jun 11","Jun 12","Jun 13","Jun 14","Jun 15","Jun 16","Jun 17","Jun 18","Jun 19","Jun 20","Jun 21","Jun 22","Jun 23"],"txDaily":[49,31.1,50.4,63.1,41.8,40.1,13.8,15.1,48.5,50.8,56.9,53.8,54.5,49.9,49.1,49.3,14.1,65.2,70.9,58.6,49.6,64.7,52.3,62.5,70.5,56.4,55.2,62.2,48.7,64.9,61.2,67.4,64.9,67.8,55,59.5,66.6,57.7,61.8,58.1,41.4,39.5,56.2,48.1,55.3,58.4,53.5,53.9,55.7,60.3,58.3,71.3,59.7,69.9,56.9,66.3,65.1,72.3,71.4,70.3,72],"txRoll":[49,34.5,41.8,49.6,47.8,46.4,42.4,39.3,41.7,41.7,39.8,41.7,43.9,48.3,52,52,45.7,47.4,50.2,50.8,50.8,53,53.4,60.8,61.6,59.4,59,60.7,58.5,60.3,60.1,59.7,60.9,62.7,61.7,63.1,63.3,62.8,62,61.1,57.5,55.6,55.1,52.3,51.9,51.3,50.6,52.4,54.5,55.1,56.5,59,59.2,61.7,62.1,63.5,64.2,66.1,66.1,67.6,67.8],"bytesRoll":[84.6,78.3,82.5,86.3,85.3,85.2,83.5,82.1,84,80.8,78.9,81,82.4,85.1,86.8,85.3,88.1,90.1,90.9,90.9,90.6,91.4,92.8,93.1,93,91.8,91.1,91.7,91.2,92.2,92.4,92.4,93.5,94.5,94.5,94.7,94.6,94.7,94.7,94.7,94.1,93.7,93.7,93.2,93,92.8,92.6,93.1,93.7,94,94.4,94.9,94.9,95.4,95.5,95.7,95.8,96.1,96,96.2,96.3],"donutAlk":92.2,"span":"Apr 24 – Jun 23","days":61,"totalTx":12797972};
+const D={"labels":["Apr 24","Apr 25","Apr 26","Apr 27","Apr 28","Apr 29","Apr 30","May 1","May 2","May 3","May 4","May 5","May 6","May 7","May 8","May 9","May 10","May 11","May 12","May 13","May 14","May 15","May 16","May 17","May 18","May 19","May 20","May 21","May 22","May 23","May 24","May 25","May 26","May 27","May 28","May 29","May 30","May 31","Jun 1","Jun 2","Jun 3","Jun 4","Jun 5","Jun 6","Jun 7","Jun 8","Jun 9","Jun 10","Jun 11","Jun 12","Jun 13","Jun 14","Jun 15","Jun 16","Jun 17","Jun 18","Jun 19","Jun 20","Jun 21","Jun 22","Jun 23","Jun 24"],"txDaily":[49,31.1,50.4,63.1,41.8,40.1,13.8,15.1,48.5,50.8,56.9,53.8,54.5,49.9,49.1,49.3,14.1,65.2,70.9,58.6,49.6,64.7,52.3,62.5,70.5,56.4,55.2,62.2,48.7,64.9,61.2,67.4,64.9,67.8,55,59.5,66.6,57.7,61.8,58.1,41.4,39.5,56.2,48.1,55.3,58.4,53.5,53.9,55.7,60.3,58.3,71.3,59.7,69.9,56.9,66.3,65.1,72.3,71.4,70.3,72,75.3],"bytesDaily":[84.6,76.3,86.2,91.1,81.6,84.6,55.8,60.5,90,69.9,85.2,92.8,92.5,91.8,90.5,79.2,84.8,95,96.1,92.1,89.6,95.1,88.6,92.5,94.8,87.7,87.3,93.7,92.2,95.6,94.2,94.9,94.9,95.3,93.5,94.1,94.9,94.7,95.6,94.7,89.9,88.7,93.8,91.8,93.8,94.6,93.6,93.7,94.3,95.5,94.9,96.7,94.9,96.7,94.5,96.1,96.2,96.6,96.6,96.4,97.1,97.4],"dieselDaily":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,75.1],"donut":[92.2,0,98.8],"span":"Apr 24 – Jun 24","days":62,"totalTx":12919752};
 Chart.defaults.color='#9a9aa3'; Chart.defaults.font.family='system-ui,sans-serif';
 const pc=v=>v+'%', grid='rgba(255,255,255,0.07)';
 new Chart(g,{type:'line',data:{labels:D.labels,datasets:[
- {label:'Transactions — daily',data:D.txDaily,borderColor:'transparent',backgroundColor:'rgba(157,148,232,0.45)',showLine:false,pointRadius:1.8},
- {label:'OP_RETURN bytes — 7-day avg',data:D.bytesRoll,borderColor:'#2DBE8E',fill:false,pointRadius:0,tension:.35,borderWidth:2.5},
- {label:'Transactions — 7-day avg',data:D.txRoll,borderColor:'#9d94e8',fill:false,pointRadius:0,tension:.35,borderWidth:2.5}]},
+ {label:'OP_RETURN bytes',data:D.bytesDaily,borderColor:'#2DBE8E',fill:false,pointRadius:1.5,tension:.25,borderWidth:2},
+ {label:'Transactions',data:D.txDaily,borderColor:'#9d94e8',fill:false,pointRadius:1.5,tension:.25,borderWidth:2}]},
  options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y+'%'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
-new Chart(d,{type:'doughnut',data:{labels:['Alkanes','Everything else'],datasets:[{data:[D.donutAlk,+(100-D.donutAlk).toFixed(1)],backgroundColor:['#2DBE8E','#3a3a42'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'64%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.parsed+'%'}}}}});
+new Chart(m,{type:'line',data:{labels:D.labels,datasets:[
+ {label:'DIESEL mints',data:D.dieselDaily,borderColor:'#E9A23B',backgroundColor:'rgba(233,162,59,0.12)',fill:true,pointRadius:1.5,tension:.25,borderWidth:2}]},
+ options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'% of all tx'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
+new Chart(d,{type:'doughnut',data:{labels:['Alkanes','Runes','Other'],datasets:[{data:D.donut,backgroundColor:['#2DBE8E','#E9A23B','#4a4a52'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.parsed+'%'}}}}});
 </script></body></html>
