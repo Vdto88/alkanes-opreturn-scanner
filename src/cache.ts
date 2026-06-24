@@ -8,6 +8,7 @@ export interface BlockResult {
   time: number; // mediantime do bloco (unix s) — pra datar com precisão
   aggregate: ScanAggregate;
   decodeFailures: number;
+  nonDieselTargets: Record<string, number>; // "block:tx" -> contagem (Alkanes não-DIESEL)
 }
 
 const blockPath = (dir: string, height: number): string => join(dir, `${height}.json`);

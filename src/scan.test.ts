@@ -40,8 +40,8 @@ describe('scanRange', () => {
     let txsCalls = 0;
     const cached: BlockResult = {
       height: 100, hash: 'hash100', time: 1782000000,
-      aggregate: { totalTx: 5, txWithOpReturn: 2, txAlkanes: 1, opReturnBytesTotal: 60, runestoneBytesTotal: 30, alkanesBytesTotal: 29, dieselMints: 1 },
-      decodeFailures: 0,
+      aggregate: { totalTx: 5, txWithOpReturn: 2, txAlkanes: 1, opReturnBytesTotal: 60, runestoneBytesTotal: 30, alkanesBytesTotal: 29, dieselMints: 1, feeTotalSats: 0, feeAlkanesSats: 0, feeOpReturnSats: 0 },
+      decodeFailures: 0, nonDieselTargets: {},
     };
     const r = await scanRange(100, 100, {
       useCache: true,
@@ -64,6 +64,20 @@ describe('scanRange', () => {
     const r = await scanRange(100, 103, { useCache: false, sampleEvery: 2, deps });
     expect(r.coverage.sampled).toBe(true);
     expect(r.coverage.blocksScanned).toBe(2); // 100 e 102
+  });
+
+  it('soma fees por bucket e agrega nonDieselTargets', async () => {
+    const { deps } = stubDeps({
+      100: [
+        { txid: 'cb', vout: [{ scriptpubkey: P2WPKH }], fee: 0, is_coinbase: true },
+        { txid: 'a', vout: [{ scriptpubkey: ALKANES }], fee: 500 },
+      ],
+    });
+    const r = await scanRange(100, 100, { useCache: false, deps });
+    expect(r.aggregate.feeTotalSats).toBe(500);
+    expect(r.aggregate.feeAlkanesSats).toBe(500);
+    expect(r.aggregate.feeOpReturnSats).toBe(500);
+    expect(r.nonDieselTargets['2:77627']).toBe(1);
   });
 
   it('pula bloco que falha (depois dos retries) e continua o range', async () => {
