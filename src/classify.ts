@@ -13,6 +13,7 @@ export interface TxClass {
   alkanesBytes: number;
   decodeFailed: boolean;
   isDieselMint: boolean; // cellpack target 2:0 opcode 77 (mint do genesis alkane DIESEL)
+  nonDieselTarget?: string; // "block:tx" do cellpack quando Alkanes e NÃO é mint DIESEL (p/ ranking)
 }
 
 const DIESEL_BLOCK = 2n;
@@ -28,6 +29,7 @@ export function classifyTx(vouts: Vout[]): TxClass {
   let isAlkanes = false;
   let decodeFailed = false;
   let isDieselMint = false;
+  let alkTarget: string | undefined;
   let opReturnBytes = 0;
   let runestoneBytes = 0;
   let alkanesBytes = 0;
@@ -52,10 +54,14 @@ export function classifyTx(vouts: Vout[]): TxClass {
         && p.cellpack.opcode === DIESEL_MINT_OPCODE)) {
         isDieselMint = true;
       }
+      const ap = r.protostones.find((p) => p.isAlkanes && p.cellpack);
+      if (ap?.cellpack && alkTarget === undefined) {
+        alkTarget = `${ap.cellpack.target.block}:${ap.cellpack.target.tx}`;
+      }
     } catch {
       decodeFailed = true;
     }
   });
 
-  return { hasOpReturn, opReturnBytes, hasRunestone, runestoneBytes, isAlkanes, alkanesBytes, decodeFailed, isDieselMint };
+  return { hasOpReturn, opReturnBytes, hasRunestone, runestoneBytes, isAlkanes, alkanesBytes, decodeFailed, isDieselMint, nonDieselTarget: isDieselMint ? undefined : alkTarget };
 }

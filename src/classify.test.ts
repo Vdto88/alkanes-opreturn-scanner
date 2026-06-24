@@ -49,4 +49,10 @@ describe('classifyTx', () => {
     expect(c.opReturnBytes).toBe(0);
     expect(c.isAlkanes).toBe(false);
   });
+
+  it('nonDieselTarget = block:tx do cellpack (Alkanes não-DIESEL); DIESEL e não-Alkanes → undefined', () => {
+    expect(classifyTx([{ scriptpubkey: ALKANES }]).nonDieselTarget).toBe('2:77627');
+    expect(classifyTx([{ scriptpubkey: DIESEL }]).nonDieselTarget).toBeUndefined();
+    expect(classifyTx([{ scriptpubkey: P2WPKH }]).nonDieselTarget).toBeUndefined();
+  });
 });
