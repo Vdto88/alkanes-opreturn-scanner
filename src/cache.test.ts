@@ -12,8 +12,8 @@ describe('cache', () => {
       height: 800000,
       hash: 'abcd',
       time: 1782000000,
-      aggregate: { totalTx: 3, txWithOpReturn: 2, txAlkanes: 1, opReturnBytesTotal: 50, runestoneBytesTotal: 30, alkanesBytesTotal: 29, dieselMints: 1 },
-      decodeFailures: 0,
+      aggregate: { totalTx: 3, txWithOpReturn: 2, txAlkanes: 1, opReturnBytesTotal: 50, runestoneBytesTotal: 30, alkanesBytesTotal: 29, dieselMints: 1, feeTotalSats: 0, feeAlkanesSats: 0, feeOpReturnSats: 0 },
+      decodeFailures: 0, nonDieselTargets: {},
     };
     writeBlock(dir, r);
     expect(readBlock(dir, 800000)).toEqual(r);
