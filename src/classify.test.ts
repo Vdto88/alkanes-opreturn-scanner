@@ -15,6 +15,7 @@ describe('classifyTx', () => {
     expect(c.isAlkanes).toBe(true);
     expect(c.decodeFailed).toBe(false);
     expect(c.opReturnBytes).toBe(29);
+    expect(c.runestoneBytes).toBe(29);
     expect(c.alkanesBytes).toBe(29);
     expect(c.isDieselMint).toBe(false); // target 2:77627, não 2:0
   });
@@ -31,6 +32,7 @@ describe('classifyTx', () => {
     expect(c.hasRunestone).toBe(false);
     expect(c.isAlkanes).toBe(false);
     expect(c.opReturnBytes).toBe(38);
+    expect(c.runestoneBytes).toBe(0); // não é 6a5d → conta como "Other", não Runes
     expect(c.alkanesBytes).toBe(0);
   });
 

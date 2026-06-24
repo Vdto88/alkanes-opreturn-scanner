@@ -46,6 +46,7 @@ const row: HistoryRow = {
   txWithOpReturn: a.txWithOpReturn,
   txAlkanes: a.txAlkanes,
   opReturnBytes: a.opReturnBytesTotal,
+  runestoneBytes: a.runestoneBytesTotal,
   alkanesBytes: a.alkanesBytesTotal,
   dieselMints: a.dieselMints,
 };

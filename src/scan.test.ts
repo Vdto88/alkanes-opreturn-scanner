@@ -40,7 +40,7 @@ describe('scanRange', () => {
     let txsCalls = 0;
     const cached: BlockResult = {
       height: 100, hash: 'hash100', time: 1782000000,
-      aggregate: { totalTx: 5, txWithOpReturn: 2, txAlkanes: 1, opReturnBytesTotal: 60, alkanesBytesTotal: 29, dieselMints: 1 },
+      aggregate: { totalTx: 5, txWithOpReturn: 2, txAlkanes: 1, opReturnBytesTotal: 60, runestoneBytesTotal: 30, alkanesBytesTotal: 29, dieselMints: 1 },
       decodeFailures: 0,
     };
     const r = await scanRange(100, 100, {

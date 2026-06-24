@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import {
-  readHistory, rollup, alkShareCount, alkBytesShare, dieselShareCount, utcDate, type HistoryRow, type Sums,
+  readHistory, rollup, alkShareCount, alkBytesShare, dieselShareCount, runesBytesShare, otherBytesShare,
+  utcDate, type HistoryRow, type Sums,
 } from './history';
 
 // Lê o history.csv e gera report.html (standalone, tema escuro) com:
@@ -38,11 +39,17 @@ const dieselOfAlkanes = all.txAlkanes ? r1(all.dieselMints / all.txAlkanes) : 0;
 // estimativa de mints/dia no full-day (extrapola a amostra: mints/blocosAmostrados × ~144)
 const estDieselPerDay = Math.round((d30.dieselMints / Math.max(1, d30.blocksScanned)) * 144);
 
+// composição dos bytes de OP_RETURN (all time): Alkanes / Runes / Other
+const donutAlk = r1(alkBytesShare(all));
+const donutRunes = r1(runesBytesShare(all));
+const donutOther = r1(otherBytesShare(all));
+
 const data = {
   labels: rows.map((r) => mday(r.date)),
   txDaily: rows.map((r) => r1(alkShareCount(sumsOfRow(r)))),
   bytesDaily: rows.map((r) => r1(alkBytesShare(sumsOfRow(r)))),
   dieselDaily: rows.map((r) => r1(dieselShareCount(sumsOfRow(r)))),
+  donut: [donutAlk, donutRunes, donutOther],
   span: `${mday(rows[0].date)} – ${mday(rows[rows.length - 1].date)}`,
   days: rows.length,
   totalTx: all.totalTx,
@@ -86,6 +93,10 @@ const html = `<!doctype html>
 <div class="legend"><span><span class="sw" style="background:var(--amber)"></span>DIESEL mints (% of all tx)</span></div>
 <div class="wrap" style="height:240px"><canvas id="m"></canvas></div>
 
+<h2>OP_RETURN bytes (all time)</h2>
+<div class="legend"><span><span class="sw" style="background:var(--teal)"></span>Alkanes ${donutAlk}%</span><span><span class="sw" style="background:var(--amber)"></span>Runes ${donutRunes}%</span><span><span class="sw" style="background:#4a4a52"></span>Other ${donutOther}%</span></div>
+<div class="wrap" style="height:230px;max-width:360px"><canvas id="d"></canvas></div>
+
 <h2>How it's calculated</h2>
 <div class="how">
   <p>We read every Bitcoin block in the window and inspect each transaction's outputs. An output whose script starts with <code>6a</code> is an <b>OP_RETURN</b>; one starting <code>6a5d</code> is a Runestone.</p>
@@ -105,6 +116,7 @@ new Chart(g,{type:'line',data:{labels:D.labels,datasets:[
 new Chart(m,{type:'line',data:{labels:D.labels,datasets:[
  {label:'DIESEL mints',data:D.dieselDaily,borderColor:'#E9A23B',backgroundColor:'rgba(233,162,59,0.12)',fill:true,pointRadius:1.5,tension:.25,borderWidth:2}]},
  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'% of all tx'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
+new Chart(d,{type:'doughnut',data:{labels:['Alkanes','Runes','Other'],datasets:[{data:D.donut,backgroundColor:['#2DBE8E','#E9A23B','#4a4a52'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.parsed+'%'}}}}});
 </script></body></html>`;
 
 writeFileSync('report.html', html);

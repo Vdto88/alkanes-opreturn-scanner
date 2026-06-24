@@ -12,12 +12,13 @@ export interface HistoryRow {
   txWithOpReturn: number;
   txAlkanes: number;
   opReturnBytes: number;
+  runestoneBytes: number; // bytes de todos os 6a5d (Runes + Alkanes); Runes = runestone − alkanes
   alkanesBytes: number;
   dieselMints: number; // tx que são mint de DIESEL (cellpack 2:0 op77)
 }
 
 const COLS: (keyof HistoryRow)[] = [
-  'date', 'fromHeight', 'toHeight', 'blocksScanned', 'totalTx', 'txWithOpReturn', 'txAlkanes', 'opReturnBytes', 'alkanesBytes', 'dieselMints',
+  'date', 'fromHeight', 'toHeight', 'blocksScanned', 'totalTx', 'txWithOpReturn', 'txAlkanes', 'opReturnBytes', 'runestoneBytes', 'alkanesBytes', 'dieselMints',
 ];
 
 export function readHistory(path: string): HistoryRow[] {
@@ -46,6 +47,7 @@ export function readHistory(path: string): HistoryRow[] {
       txWithOpReturn: num('txWithOpReturn'),
       txAlkanes: num('txAlkanes'),
       opReturnBytes: num('opReturnBytes'),
+      runestoneBytes: num('runestoneBytes'),
       alkanesBytes: num('alkanesBytes'),
       dieselMints: num('dieselMints'),
     };
@@ -66,17 +68,17 @@ export function upsert(rows: HistoryRow[], row: HistoryRow): HistoryRow[] {
 }
 
 export interface Sums {
-  blocksScanned: number; totalTx: number; txWithOpReturn: number; txAlkanes: number; opReturnBytes: number; alkanesBytes: number; dieselMints: number;
+  blocksScanned: number; totalTx: number; txWithOpReturn: number; txAlkanes: number; opReturnBytes: number; runestoneBytes: number; alkanesBytes: number; dieselMints: number;
 }
 
 /** Soma as linhas com date >= sinceDate (inclusive). */
 export function rollup(rows: HistoryRow[], sinceDate: string): Sums {
-  const s: Sums = { blocksScanned: 0, totalTx: 0, txWithOpReturn: 0, txAlkanes: 0, opReturnBytes: 0, alkanesBytes: 0, dieselMints: 0 };
+  const s: Sums = { blocksScanned: 0, totalTx: 0, txWithOpReturn: 0, txAlkanes: 0, opReturnBytes: 0, runestoneBytes: 0, alkanesBytes: 0, dieselMints: 0 };
   for (const r of rows) {
     if (r.date < sinceDate) continue;
     s.blocksScanned += r.blocksScanned; s.totalTx += r.totalTx; s.txWithOpReturn += r.txWithOpReturn;
-    s.txAlkanes += r.txAlkanes; s.opReturnBytes += r.opReturnBytes; s.alkanesBytes += r.alkanesBytes;
-    s.dieselMints += r.dieselMints;
+    s.txAlkanes += r.txAlkanes; s.opReturnBytes += r.opReturnBytes; s.runestoneBytes += r.runestoneBytes;
+    s.alkanesBytes += r.alkanesBytes; s.dieselMints += r.dieselMints;
   }
   return s;
 }
@@ -85,6 +87,9 @@ export const alkShareCount = (s: Sums): number => (s.totalTx ? s.txAlkanes / s.t
 export const alkBytesShare = (s: Sums): number => (s.opReturnBytes ? s.alkanesBytes / s.opReturnBytes : 0);
 export const opReturnShare = (s: Sums): number => (s.totalTx ? s.txWithOpReturn / s.totalTx : 0);
 export const dieselShareCount = (s: Sums): number => (s.totalTx ? s.dieselMints / s.totalTx : 0);
+// Decomposição dos bytes de OP_RETURN: Alkanes + Runes + Other = 100%
+export const runesBytesShare = (s: Sums): number => (s.opReturnBytes ? Math.max(0, s.runestoneBytes - s.alkanesBytes) / s.opReturnBytes : 0);
+export const otherBytesShare = (s: Sums): number => (s.opReturnBytes ? Math.max(0, s.opReturnBytes - s.runestoneBytes) / s.opReturnBytes : 0);
 
 /** Data UTC (YYYY-MM-DD) deslocada por `days` a partir de hoje. */
 export function utcDate(days = 0): string {

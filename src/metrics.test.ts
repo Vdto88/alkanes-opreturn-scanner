@@ -8,6 +8,7 @@ describe('computeMetrics', () => {
       txWithOpReturn: 200,
       txAlkanes: 80,
       opReturnBytesTotal: 10000,
+      runestoneBytesTotal: 9500,
       alkanesBytesTotal: 9100,
       dieselMints: 70,
     };

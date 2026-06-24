@@ -12,7 +12,7 @@ describe('cache', () => {
       height: 800000,
       hash: 'abcd',
       time: 1782000000,
-      aggregate: { totalTx: 3, txWithOpReturn: 2, txAlkanes: 1, opReturnBytesTotal: 50, alkanesBytesTotal: 29, dieselMints: 1 },
+      aggregate: { totalTx: 3, txWithOpReturn: 2, txAlkanes: 1, opReturnBytesTotal: 50, runestoneBytesTotal: 30, alkanesBytesTotal: 29, dieselMints: 1 },
       decodeFailures: 0,
     };
     writeBlock(dir, r);

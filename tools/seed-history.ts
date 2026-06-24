@@ -10,7 +10,7 @@ import { readHistory, writeHistory, upsert, type HistoryRow } from './history';
 interface Block {
   height: number;
   time?: number;
-  aggregate: { totalTx: number; txWithOpReturn: number; txAlkanes: number; opReturnBytesTotal: number; alkanesBytesTotal: number; dieselMints?: number };
+  aggregate: { totalTx: number; txWithOpReturn: number; txAlkanes: number; opReturnBytesTotal: number; runestoneBytesTotal?: number; alkanesBytesTotal: number; dieselMints?: number };
 }
 
 const args = process.argv.slice(2).filter((a) => a !== '--merge');
@@ -40,7 +40,7 @@ for (const b of blocks) {
   const a = b.aggregate;
   const r = byDate.get(date) ?? {
     date, fromHeight: b.height, toHeight: b.height, blocksScanned: 0,
-    totalTx: 0, txWithOpReturn: 0, txAlkanes: 0, opReturnBytes: 0, alkanesBytes: 0, dieselMints: 0,
+    totalTx: 0, txWithOpReturn: 0, txAlkanes: 0, opReturnBytes: 0, runestoneBytes: 0, alkanesBytes: 0, dieselMints: 0,
   };
   r.fromHeight = Math.min(r.fromHeight, b.height);
   r.toHeight = Math.max(r.toHeight, b.height);
@@ -49,6 +49,7 @@ for (const b of blocks) {
   r.txWithOpReturn += a.txWithOpReturn;
   r.txAlkanes += a.txAlkanes;
   r.opReturnBytes += a.opReturnBytesTotal;
+  r.runestoneBytes += a.runestoneBytesTotal ?? 0;
   r.alkanesBytes += a.alkanesBytesTotal;
   r.dieselMints += a.dieselMints ?? 0;
   byDate.set(date, r);

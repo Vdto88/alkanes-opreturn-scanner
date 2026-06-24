@@ -39,6 +39,7 @@ function add(into: ScanAggregate, from: ScanAggregate): void {
   into.txWithOpReturn += from.txWithOpReturn;
   into.txAlkanes += from.txAlkanes;
   into.opReturnBytesTotal += from.opReturnBytesTotal;
+  into.runestoneBytesTotal += from.runestoneBytesTotal;
   into.alkanesBytesTotal += from.alkanesBytesTotal;
   into.dieselMints += from.dieselMints;
 }
@@ -55,6 +56,7 @@ async function scanBlock(height: number, opts: ScanOptions, deps: ScanDeps): Pro
     if (c.isAlkanes) agg.txAlkanes += 1;
     if (c.isDieselMint) agg.dieselMints += 1;
     agg.opReturnBytesTotal += c.opReturnBytes;
+    agg.runestoneBytesTotal += c.runestoneBytes;
     agg.alkanesBytesTotal += c.alkanesBytes;
     if (c.decodeFailed) decodeFailures += 1;
   }

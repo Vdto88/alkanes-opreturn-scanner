@@ -8,6 +8,7 @@ export interface TxClass {
   hasOpReturn: boolean;
   opReturnBytes: number;
   hasRunestone: boolean;
+  runestoneBytes: number; // bytes de TODOS os outputs 6a5d (Runes + Alkanes). Runes = runestone − alkanes
   isAlkanes: boolean;
   alkanesBytes: number;
   decodeFailed: boolean;
@@ -28,6 +29,7 @@ export function classifyTx(vouts: Vout[]): TxClass {
   let decodeFailed = false;
   let isDieselMint = false;
   let opReturnBytes = 0;
+  let runestoneBytes = 0;
   let alkanesBytes = 0;
 
   vouts.forEach((v, i) => {
@@ -38,6 +40,7 @@ export function classifyTx(vouts: Vout[]): TxClass {
     opReturnBytes += bytes;
     if (!spk.startsWith('6a5d')) return;
     hasRunestone = true;
+    runestoneBytes += bytes;
     try {
       const r = decodeOpReturn(spk, i);
       if (r.protostones.some((p) => p.isAlkanes)) {
@@ -54,5 +57,5 @@ export function classifyTx(vouts: Vout[]): TxClass {
     }
   });
 
-  return { hasOpReturn, opReturnBytes, hasRunestone, isAlkanes, alkanesBytes, decodeFailed, isDieselMint };
+  return { hasOpReturn, opReturnBytes, hasRunestone, runestoneBytes, isAlkanes, alkanesBytes, decodeFailed, isDieselMint };
 }
