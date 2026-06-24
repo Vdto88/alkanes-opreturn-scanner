@@ -91,4 +91,19 @@ describe('blockTxs', () => {
     const txs = await blockTxs('H', { source: 'mempool', fetchImpl: f });
     expect(txs.map((t) => t.txid)).toEqual(['a', 'b']);
   });
+
+  it('mantém fee e is_coinbase de cada tx', async () => {
+    const base = 'https://mempool.space/api';
+    const routes: Record<string, string> = {
+      [`${base}/block/H`]: JSON.stringify({ tx_count: 2 }),
+      [`${base}/block/H/txs/0`]: JSON.stringify([
+        { txid: 'cb', vout: [], fee: 0, is_coinbase: true },
+        { txid: 'a', vout: [{ scriptpubkey: '6a' }], fee: 1234, is_coinbase: false },
+      ]),
+    };
+    const { f } = mockFetch((url) => { const b = routes[url]; if (b === undefined) throw new Error('rota ' + url); return { body: b }; });
+    const txs = await blockTxs('H', { source: 'mempool', fetchImpl: f });
+    expect(txs[0].is_coinbase).toBe(true);
+    expect(txs[1].fee).toBe(1234);
+  });
 });

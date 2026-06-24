@@ -15,6 +15,8 @@ export interface EsploraOptions {
 export interface EsploraTx {
   txid: string;
   vout: { scriptpubkey: string }[];
+  fee?: number;            // sats (esplora devolve na mesma resposta); coinbase = 0/ausente
+  is_coinbase?: boolean;
 }
 
 const REST_BASE: Record<'mempool' | 'alkanode', string> = {
