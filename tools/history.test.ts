@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readHistory, writeHistory, upsert, rollup, alkShareCount, alkBytesShare, alkExDieselShareCount, type HistoryRow } from './history';
+import { readHistory, writeHistory, upsert, rollup, alkShareCount, alkBytesShare, alkExDieselShareCount, feeAlkanesShare, feeOpReturnShare, minerRevenueUsdDay, type HistoryRow } from './history';
 
 const mk = (date: string, txAlkanes: number, totalTx = 100, alkanesBytes = 90, opReturnBytes = 100): HistoryRow => ({
-  date, fromHeight: 1, toHeight: 2, blocksScanned: 1, totalTx, txWithOpReturn: 50, txAlkanes, opReturnBytes, runestoneBytes: alkanesBytes, alkanesBytes, dieselMints: txAlkanes,
+  date, fromHeight: 1, toHeight: 2, blocksScanned: 1, totalTx, txWithOpReturn: 50, txAlkanes, opReturnBytes, runestoneBytes: alkanesBytes, alkanesBytes, dieselMints: txAlkanes, feeTotalSats: 0, feeAlkanesSats: 0, feeOpReturnSats: 0, btcUsd: 0,
 });
 
 describe('history csv', () => {
@@ -43,7 +43,28 @@ describe('history csv', () => {
     const s = {
       blocksScanned: 1, totalTx: 200, txWithOpReturn: 50, txAlkanes: 80,
       opReturnBytes: 100, runestoneBytes: 90, alkanesBytes: 90, dieselMints: 50,
+      feeTotalSats: 0, feeAlkanesSats: 0, feeOpReturnSats: 0, btcUsd: 0,
     };
     expect(alkExDieselShareCount(s)).toBeCloseTo(0.15); // (80 − 50) / 200
+  });
+
+  it('feeAlkanesShare / feeOpReturnShare = fee do bucket / fee total', () => {
+    const s = {
+      blocksScanned: 1, totalTx: 10, txWithOpReturn: 5, txAlkanes: 3,
+      opReturnBytes: 1, runestoneBytes: 1, alkanesBytes: 1, dieselMints: 1,
+      feeTotalSats: 1000, feeAlkanesSats: 800, feeOpReturnSats: 900, btcUsd: 0,
+    };
+    expect(feeAlkanesShare(s)).toBeCloseTo(0.8);
+    expect(feeOpReturnShare(s)).toBeCloseTo(0.9);
+  });
+
+  it('minerRevenueUsdDay = (fees extrapoladas + subsídio) * btcUsd', () => {
+    const r: HistoryRow = {
+      date: '2026-06-20', fromHeight: 1, toHeight: 2, blocksScanned: 1,
+      totalTx: 0, txWithOpReturn: 0, txAlkanes: 0, opReturnBytes: 0, runestoneBytes: 0,
+      alkanesBytes: 0, dieselMints: 0, feeTotalSats: 1_000_000, feeAlkanesSats: 0, feeOpReturnSats: 0, btcUsd: 100000,
+    };
+    // feeDayBtc = 1_000_000/1*144/1e8 = 1.44 ; +144*3.125 = 450 ; total 451.44 BTC * 100000 USD
+    expect(minerRevenueUsdDay(r)).toBeCloseTo(451.44 * 100000, 0);
   });
 });

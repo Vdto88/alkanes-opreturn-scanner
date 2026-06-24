@@ -15,10 +15,14 @@ export interface HistoryRow {
   runestoneBytes: number; // bytes de todos os 6a5d (Runes + Alkanes); Runes = runestone − alkanes
   alkanesBytes: number;
   dieselMints: number; // tx que são mint de DIESEL (cellpack 2:0 op77)
+  feeTotalSats: number;    // soma das fees de todas as tx do dia (amostra)
+  feeAlkanesSats: number;  // fees das tx Alkanes
+  feeOpReturnSats: number; // fees das tx com OP_RETURN
+  btcUsd: number;          // preço representativo do BTC em USD no dia (0 se indisponível)
 }
 
 const COLS: (keyof HistoryRow)[] = [
-  'date', 'fromHeight', 'toHeight', 'blocksScanned', 'totalTx', 'txWithOpReturn', 'txAlkanes', 'opReturnBytes', 'runestoneBytes', 'alkanesBytes', 'dieselMints',
+  'date', 'fromHeight', 'toHeight', 'blocksScanned', 'totalTx', 'txWithOpReturn', 'txAlkanes', 'opReturnBytes', 'runestoneBytes', 'alkanesBytes', 'dieselMints', 'feeTotalSats', 'feeAlkanesSats', 'feeOpReturnSats', 'btcUsd',
 ];
 
 export function readHistory(path: string): HistoryRow[] {
@@ -50,6 +54,10 @@ export function readHistory(path: string): HistoryRow[] {
       runestoneBytes: num('runestoneBytes'),
       alkanesBytes: num('alkanesBytes'),
       dieselMints: num('dieselMints'),
+      feeTotalSats: num('feeTotalSats'),
+      feeAlkanesSats: num('feeAlkanesSats'),
+      feeOpReturnSats: num('feeOpReturnSats'),
+      btcUsd: num('btcUsd'),
     };
   });
 }
@@ -69,16 +77,18 @@ export function upsert(rows: HistoryRow[], row: HistoryRow): HistoryRow[] {
 
 export interface Sums {
   blocksScanned: number; totalTx: number; txWithOpReturn: number; txAlkanes: number; opReturnBytes: number; runestoneBytes: number; alkanesBytes: number; dieselMints: number;
+  feeTotalSats: number; feeAlkanesSats: number; feeOpReturnSats: number;
 }
 
 /** Soma as linhas com date >= sinceDate (inclusive). */
 export function rollup(rows: HistoryRow[], sinceDate: string): Sums {
-  const s: Sums = { blocksScanned: 0, totalTx: 0, txWithOpReturn: 0, txAlkanes: 0, opReturnBytes: 0, runestoneBytes: 0, alkanesBytes: 0, dieselMints: 0 };
+  const s: Sums = { blocksScanned: 0, totalTx: 0, txWithOpReturn: 0, txAlkanes: 0, opReturnBytes: 0, runestoneBytes: 0, alkanesBytes: 0, dieselMints: 0, feeTotalSats: 0, feeAlkanesSats: 0, feeOpReturnSats: 0 };
   for (const r of rows) {
     if (r.date < sinceDate) continue;
     s.blocksScanned += r.blocksScanned; s.totalTx += r.totalTx; s.txWithOpReturn += r.txWithOpReturn;
     s.txAlkanes += r.txAlkanes; s.opReturnBytes += r.opReturnBytes; s.runestoneBytes += r.runestoneBytes;
     s.alkanesBytes += r.alkanesBytes; s.dieselMints += r.dieselMints;
+    s.feeTotalSats += r.feeTotalSats; s.feeAlkanesSats += r.feeAlkanesSats; s.feeOpReturnSats += r.feeOpReturnSats;
   }
   return s;
 }
@@ -92,6 +102,14 @@ export const alkExDieselShareCount = (s: Sums): number => (s.totalTx ? Math.max(
 // Decomposição dos bytes de OP_RETURN: Alkanes + Runes + Other = 100%
 export const runesBytesShare = (s: Sums): number => (s.opReturnBytes ? Math.max(0, s.runestoneBytes - s.alkanesBytes) / s.opReturnBytes : 0);
 export const otherBytesShare = (s: Sums): number => (s.opReturnBytes ? Math.max(0, s.opReturnBytes - s.runestoneBytes) / s.opReturnBytes : 0);
+// Fees: quanto da receita de fee vem de Alkanes / OP_RETURN
+export const feeAlkanesShare = (s: Sums): number => (s.feeTotalSats ? s.feeAlkanesSats / s.feeTotalSats : 0);
+export const feeOpReturnShare = (s: Sums): number => (s.feeTotalSats ? s.feeOpReturnSats / s.feeTotalSats : 0);
+// Receita do minerador no dia (USD): fees extrapoladas da amostra pro dia cheio (×144/blocosAmostrados)
+// + subsídio fixo (3,125 BTC/bloco × 144), tudo × preço do BTC. 0 sem preço/amostra.
+const SUBSIDY_SATS = 312_500_000; // 3,125 BTC (blocos 930000–955153, entre halvings 840000 e 1050000)
+export const minerRevenueUsdDay = (r: HistoryRow): number =>
+  (r.blocksScanned ? ((r.feeTotalSats / r.blocksScanned * 144 + 144 * SUBSIDY_SATS) / 1e8) * r.btcUsd : 0);
 
 /** Data UTC (YYYY-MM-DD) deslocada por `days` a partir de hoje. */
 export function utcDate(days = 0): string {
