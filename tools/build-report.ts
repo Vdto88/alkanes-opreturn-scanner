@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import {
-  readHistory, rollup, alkShareCount, alkBytesShare, dieselShareCount, runesBytesShare, otherBytesShare,
+  readHistory, rollup, alkShareCount, alkBytesShare, opReturnShare, dieselShareCount, runesBytesShare, otherBytesShare,
+  alkExDieselShareCount,
   utcDate, type HistoryRow, type Sums,
 } from './history';
 
@@ -23,7 +24,7 @@ const mday = (iso: string) => { const [, m, d] = iso.split('-'); return `${MONTH
 
 const sumsOfRow = (r: HistoryRow): Sums => ({
   blocksScanned: r.blocksScanned, totalTx: r.totalTx, txWithOpReturn: r.txWithOpReturn,
-  txAlkanes: r.txAlkanes, opReturnBytes: r.opReturnBytes, alkanesBytes: r.alkanesBytes, dieselMints: r.dieselMints,
+  txAlkanes: r.txAlkanes, opReturnBytes: r.opReturnBytes, runestoneBytes: r.runestoneBytes, alkanesBytes: r.alkanesBytes, dieselMints: r.dieselMints,
 });
 
 const all = rollup(rows, '0000-00-00');
@@ -49,6 +50,9 @@ const data = {
   txDaily: rows.map((r) => r1(alkShareCount(sumsOfRow(r)))),
   bytesDaily: rows.map((r) => r1(alkBytesShare(sumsOfRow(r)))),
   dieselDaily: rows.map((r) => r1(dieselShareCount(sumsOfRow(r)))),
+  opReturnDaily: rows.map((r) => r1(opReturnShare(sumsOfRow(r)))),
+  runesDaily: rows.map((r) => r1(runesBytesShare(sumsOfRow(r)))),
+  alkExDieselDaily: rows.map((r) => r1(alkExDieselShareCount(sumsOfRow(r)))),
   donut: [donutAlk, donutRunes, donutOther],
   span: `${mday(rows[0].date)} – ${mday(rows[rows.length - 1].date)}`,
   days: rows.length,
@@ -82,11 +86,17 @@ const html = `<!doctype html>
   ${card('Last 7 days', d7)}
   ${card('Last 30 days', d30)}
   ${card('All time', all)}
+  <div class="card"><div class="l">OP_RETURN penetration</div><div class="v">${r1(opReturnShare(all))}%</div><div class="b">${r1(opReturnShare(d30))}% last 30 days</div></div>
 </div>
 <p class="note">Of all Alkanes activity, <b>${dieselOfAlkanes}%</b> is DIESEL minting (cellpack <code>2:0</code> op&nbsp;77) — roughly <b>${estDieselPerDay.toLocaleString('en-US')}</b> mints/day estimated over the last 30 days.</p>
 
 <h2>Daily Alkanes share</h2>
-<div class="legend"><span><span class="sw" style="background:var(--teal)"></span>OP_RETURN bytes</span><span><span class="sw" style="background:var(--purple)"></span>Transactions</span></div>
+<div class="legend"><span><span class="sw" style="background:var(--teal)"></span>OP_RETURN bytes</span><span><span class="sw" style="background:var(--purple)"></span>Transactions</span><span><span class="sw" style="background:var(--faint)"></span>OP_RETURN penetration</span><span><span class="sw" style="background:var(--amber)"></span>Runes (bytes)</span><span><span class="sw" style="background:#4bb8d9"></span>Alkanes excl. DIESEL (tx)</span></div>
+<div class="legend" style="margin-bottom:6px">
+  <label><input type="checkbox" id="tgPen" checked> OP_RETURN penetration</label>
+  <label><input type="checkbox" id="tgRunes" checked> Runes</label>
+  <label><input type="checkbox" id="tgAlkEx" checked> Alkanes excl. DIESEL</label>
+</div>
 <div class="wrap"><canvas id="g"></canvas></div>
 
 <h2>DIESEL mints — share of all Bitcoin transactions</h2>
@@ -109,10 +119,14 @@ const html = `<!doctype html>
 const D=${JSON.stringify(data)};
 Chart.defaults.color='#9a9aa3'; Chart.defaults.font.family='system-ui,sans-serif';
 const pc=v=>v+'%', grid='rgba(255,255,255,0.07)';
-new Chart(g,{type:'line',data:{labels:D.labels,datasets:[
+const gChart=new Chart(g,{type:'line',data:{labels:D.labels,datasets:[
  {label:'OP_RETURN bytes',data:D.bytesDaily,borderColor:'#2DBE8E',fill:false,pointRadius:1.5,tension:.25,borderWidth:2},
- {label:'Transactions',data:D.txDaily,borderColor:'#9d94e8',fill:false,pointRadius:1.5,tension:.25,borderWidth:2}]},
+ {label:'Transactions',data:D.txDaily,borderColor:'#9d94e8',fill:false,pointRadius:1.5,tension:.25,borderWidth:2},
+ {label:'OP_RETURN penetration',data:D.opReturnDaily,borderColor:'#6f6f78',borderDash:[4,3],fill:false,pointRadius:1.5,tension:.25,borderWidth:2},
+ {label:'Runes (bytes)',data:D.runesDaily,borderColor:'#E9A23B',fill:false,pointRadius:1.5,tension:.25,borderWidth:2},
+ {label:'Alkanes excl. DIESEL (tx)',data:D.alkExDieselDaily,borderColor:'#4bb8d9',borderDash:[4,3],fill:false,pointRadius:1.5,tension:.25,borderWidth:2}]},
  options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y+'%'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
+[['tgPen',2],['tgRunes',3],['tgAlkEx',4]].forEach(([id,idx])=>{const el=document.getElementById(id);el.addEventListener('change',()=>{gChart.setDatasetVisibility(idx,el.checked);gChart.update();});});
 new Chart(m,{type:'line',data:{labels:D.labels,datasets:[
  {label:'DIESEL mints',data:D.dieselDaily,borderColor:'#E9A23B',backgroundColor:'rgba(233,162,59,0.12)',fill:true,pointRadius:1.5,tension:.25,borderWidth:2}]},
  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'% of all tx'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
