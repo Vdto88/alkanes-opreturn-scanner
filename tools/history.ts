@@ -87,6 +87,8 @@ export const alkShareCount = (s: Sums): number => (s.totalTx ? s.txAlkanes / s.t
 export const alkBytesShare = (s: Sums): number => (s.opReturnBytes ? s.alkanesBytes / s.opReturnBytes : 0);
 export const opReturnShare = (s: Sums): number => (s.totalTx ? s.txWithOpReturn / s.totalTx : 0);
 export const dieselShareCount = (s: Sums): number => (s.totalTx ? s.dieselMints / s.totalTx : 0);
+// Alkanes que NÃO são mint de DIESEL (a diversidade real do protocolo), como % de todas as tx
+export const alkExDieselShareCount = (s: Sums): number => (s.totalTx ? Math.max(0, s.txAlkanes - s.dieselMints) / s.totalTx : 0);
 // Decomposição dos bytes de OP_RETURN: Alkanes + Runes + Other = 100%
 export const runesBytesShare = (s: Sums): number => (s.opReturnBytes ? Math.max(0, s.runestoneBytes - s.alkanesBytes) / s.opReturnBytes : 0);
 export const otherBytesShare = (s: Sums): number => (s.opReturnBytes ? Math.max(0, s.opReturnBytes - s.runestoneBytes) / s.opReturnBytes : 0);

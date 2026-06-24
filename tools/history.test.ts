@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readHistory, writeHistory, upsert, rollup, alkShareCount, alkBytesShare, type HistoryRow } from './history';
+import { readHistory, writeHistory, upsert, rollup, alkShareCount, alkBytesShare, alkExDieselShareCount, type HistoryRow } from './history';
 
 const mk = (date: string, txAlkanes: number, totalTx = 100, alkanesBytes = 90, opReturnBytes = 100): HistoryRow => ({
   date, fromHeight: 1, toHeight: 2, blocksScanned: 1, totalTx, txWithOpReturn: 50, txAlkanes, opReturnBytes, runestoneBytes: alkanesBytes, alkanesBytes, dieselMints: txAlkanes,
@@ -37,5 +37,13 @@ describe('history csv', () => {
     expect(s.txAlkanes).toBe(120);
     expect(alkShareCount(s)).toBeCloseTo(0.6);
     expect(alkBytesShare(s)).toBeCloseTo(0.9);
+  });
+
+  it('alkExDieselShareCount = (txAlkanes − dieselMints) / totalTx', () => {
+    const s = {
+      blocksScanned: 1, totalTx: 200, txWithOpReturn: 50, txAlkanes: 80,
+      opReturnBytes: 100, runestoneBytes: 90, alkanesBytes: 90, dieselMints: 50,
+    };
+    expect(alkExDieselShareCount(s)).toBeCloseTo(0.15); // (80 − 50) / 200
   });
 });
