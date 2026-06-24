@@ -33,7 +33,7 @@ const d7 = rollup(rows, utcDate(-6));
 const d30 = rollup(rows, utcDate(-29));
 
 const card = (label: string, s: Sums) =>
-  `<div class="card"><div class="l">${label}</div><div class="v">${r1(alkShareCount(s))}%</div><div class="b">${r1(alkBytesShare(s))}% of bytes</div></div>`;
+  `<div class="card"><div class="l">${label}</div><div class="v">${r1(alkShareCount(s))}%</div><div class="u">Alkanes — of all BTC tx</div><div class="b">${r1(alkBytesShare(s))}% of OP_RETURN bytes</div></div>`;
 
 // DIESEL como % das tx Alkanes (mostra que Alkanes ≈ DIESEL) no período inteiro
 const dieselOfAlkanes = all.txAlkanes ? r1(all.dieselMints / all.txAlkanes) : 0;
@@ -69,7 +69,7 @@ const html = `<!doctype html>
   .sub{color:var(--muted);font-size:13px;margin:0 0 1.5rem}
   .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:1.25rem 0 1rem}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1rem 1.1rem}
-  .card .l{font-size:13px;color:var(--muted)} .card .v{font-size:27px;font-weight:600;color:var(--head);margin-top:2px} .card .b{font-size:12px;color:var(--faint);margin-top:2px}
+  .card .l{font-size:13px;color:var(--muted)} .card .v{font-size:27px;font-weight:600;color:var(--head);margin-top:2px} .card .u{font-size:11px;color:var(--muted);margin-top:1px} .card .b{font-size:12px;color:var(--faint);margin-top:2px}
   .note{font-size:13px;color:var(--muted);margin:.25rem 0 0} .note b{color:var(--head);font-weight:600}
   .legend{display:flex;flex-wrap:wrap;gap:16px;margin:8px 0 10px;font-size:12px;color:var(--muted);align-items:center}
   .sw{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:middle}
@@ -86,8 +86,9 @@ const html = `<!doctype html>
   ${card('Last 7 days', d7)}
   ${card('Last 30 days', d30)}
   ${card('All time', all)}
-  <div class="card"><div class="l">OP_RETURN penetration</div><div class="v">${r1(opReturnShare(all))}%</div><div class="b">${r1(opReturnShare(d30))}% last 30 days</div></div>
+  <div class="card"><div class="l">OP_RETURN penetration</div><div class="v">${r1(opReturnShare(all))}%</div><div class="u">of all BTC tx (carry OP_RETURN)</div><div class="b">${r1(opReturnShare(d30))}% last 30 days</div></div>
 </div>
+<p class="note">Numbers you may see elsewhere can differ — they depend on the time window and whether they measure transactions vs bytes vs outputs (and whether the coinbase is included).</p>
 <p class="note">Of all Alkanes activity, <b>${dieselOfAlkanes}%</b> is DIESEL minting (cellpack <code>2:0</code> op&nbsp;77) — roughly <b>${estDieselPerDay.toLocaleString('en-US')}</b> mints/day estimated over the last 30 days.</p>
 
 <h2>Daily Alkanes share</h2>
@@ -112,6 +113,7 @@ const html = `<!doctype html>
   <p>We read every Bitcoin block in the window and inspect each transaction's outputs. An output whose script starts with <code>6a</code> is an <b>OP_RETURN</b>; one starting <code>6a5d</code> is a Runestone.</p>
   <p>We decode the Runestone and if any protostone carries <b>protocol_tag = 1</b>, the transaction is <b>Alkanes</b>. A <b>DIESEL mint</b> is the specific case where the cellpack targets <code>2:0</code> with opcode <code>77</code> (the genesis alkane) — today that's the vast majority of all Alkanes activity.</p>
   <p><b>Share of transactions</b> = matching tx ÷ all tx. <b>Share of OP_RETURN bytes</b> = Alkanes OP_RETURN bytes ÷ all OP_RETURN bytes. Shares are unaffected by sampling; each day rests on ~24-48 sampled blocks (see <code>blocksScanned</code> in the CSV). Classification reuses the open-source <a href="https://github.com/Vdto88/alkanes-opreturn-decoder">alkanes-opreturn-decoder</a>.</p>
+  <p><b>Glossary.</b> <b>OP_RETURN penetration</b>: share of all BTC tx that carry an OP_RETURN. <b>Alkanes (tx)</b>: share of all BTC tx that are Alkanes. <b>Alkanes (bytes)</b>: share of OP_RETURN bytes that are Alkanes. <b>Runes</b>: OP_RETURN bytes that are Runestones but not Alkanes. <b>Alkanes excl. DIESEL</b>: Alkanes tx that aren't DIESEL mints — "real app" usage. <b>DIESEL</b>: mint of the genesis alkane (cellpack <code>2:0</code> op&nbsp;77).</p>
 </div>
 <footer>Source data: <a href="./history.csv">history.csv</a> (one row per day). Bytes = full output script; coinbase included. Auto-updated daily from the alkanes-opreturn-scanner.</footer>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
