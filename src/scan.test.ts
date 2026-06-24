@@ -13,7 +13,7 @@ function stubDeps(blocks: Record<number, EsploraTx[]>) {
     written,
     deps: {
       blockHash: async (h: number) => `hash${h}`,
-      blockTxs: async (hash: string) => blocks[Number(hash.replace('hash', ''))],
+      fetchBlock: async (hash: string) => ({ txs: blocks[Number(hash.replace('hash', ''))], mediantime: 1782000000 }),
       readBlock: () => null,           // força fetch
       writeBlock: (_d: string, r: BlockResult) => { written.push(r); },
     },
@@ -39,15 +39,15 @@ describe('scanRange', () => {
   it('usa o cache quando presente (não chama blockTxs)', async () => {
     let txsCalls = 0;
     const cached: BlockResult = {
-      height: 100, hash: 'hash100',
-      aggregate: { totalTx: 5, txWithOpReturn: 2, txAlkanes: 1, opReturnBytesTotal: 60, alkanesBytesTotal: 29 },
+      height: 100, hash: 'hash100', time: 1782000000,
+      aggregate: { totalTx: 5, txWithOpReturn: 2, txAlkanes: 1, opReturnBytesTotal: 60, alkanesBytesTotal: 29, dieselMints: 1 },
       decodeFailures: 0,
     };
     const r = await scanRange(100, 100, {
       useCache: true,
       deps: {
         blockHash: async () => 'hash100',
-        blockTxs: async () => { txsCalls++; return []; },
+        fetchBlock: async () => { txsCalls++; return { txs: [], mediantime: 0 }; },
         readBlock: () => cached,
         writeBlock: () => {},
       },

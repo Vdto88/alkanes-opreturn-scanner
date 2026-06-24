@@ -47,6 +47,7 @@ const row: HistoryRow = {
   txAlkanes: a.txAlkanes,
   opReturnBytes: a.opReturnBytesTotal,
   alkanesBytes: a.alkanesBytesTotal,
+  dieselMints: a.dieselMints,
 };
 
 const rows = upsert(readHistory(historyPath), row);

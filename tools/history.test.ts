@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { readHistory, writeHistory, upsert, rollup, alkShareCount, alkBytesShare, type HistoryRow } from './history';
 
 const mk = (date: string, txAlkanes: number, totalTx = 100, alkanesBytes = 90, opReturnBytes = 100): HistoryRow => ({
-  date, fromHeight: 1, toHeight: 2, blocksScanned: 1, totalTx, txWithOpReturn: 50, txAlkanes, opReturnBytes, alkanesBytes,
+  date, fromHeight: 1, toHeight: 2, blocksScanned: 1, totalTx, txWithOpReturn: 50, txAlkanes, opReturnBytes, alkanesBytes, dieselMints: txAlkanes,
 });
 
 describe('history csv', () => {

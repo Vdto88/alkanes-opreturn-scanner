@@ -1,7 +1,7 @@
 import { classifyTx } from './classify';
 import { emptyAggregate, type ScanAggregate } from './metrics';
 import { readBlock, writeBlock, type BlockResult } from './cache';
-import { blockHash, blockTxs, type EsploraOptions } from './esplora';
+import { blockHash, fetchBlock, type EsploraOptions } from './esplora';
 
 export interface Coverage {
   fromHeight: number;
@@ -22,7 +22,7 @@ export interface ScanResult {
 
 export interface ScanDeps {
   blockHash: typeof blockHash;
-  blockTxs: typeof blockTxs;
+  fetchBlock: typeof fetchBlock;
   readBlock: typeof readBlock;
   writeBlock: typeof writeBlock;
 }
@@ -40,11 +40,12 @@ function add(into: ScanAggregate, from: ScanAggregate): void {
   into.txAlkanes += from.txAlkanes;
   into.opReturnBytesTotal += from.opReturnBytesTotal;
   into.alkanesBytesTotal += from.alkanesBytesTotal;
+  into.dieselMints += from.dieselMints;
 }
 
 async function scanBlock(height: number, opts: ScanOptions, deps: ScanDeps): Promise<BlockResult> {
   const hash = await deps.blockHash(height, opts);
-  const txs = await deps.blockTxs(hash, opts);
+  const { txs, mediantime } = await deps.fetchBlock(hash, opts);
   const agg = emptyAggregate();
   let decodeFailures = 0;
   for (const tx of txs) {
@@ -52,17 +53,18 @@ async function scanBlock(height: number, opts: ScanOptions, deps: ScanDeps): Pro
     agg.totalTx += 1;
     if (c.hasOpReturn) agg.txWithOpReturn += 1;
     if (c.isAlkanes) agg.txAlkanes += 1;
+    if (c.isDieselMint) agg.dieselMints += 1;
     agg.opReturnBytesTotal += c.opReturnBytes;
     agg.alkanesBytesTotal += c.alkanesBytes;
     if (c.decodeFailed) decodeFailures += 1;
   }
-  return { height, hash, aggregate: agg, decodeFailures };
+  return { height, hash, time: mediantime, aggregate: agg, decodeFailures };
 }
 
 export async function scanRange(fromHeight: number, toHeight: number, opts: ScanOptions = {}): Promise<ScanResult> {
   const deps: ScanDeps = {
     blockHash: opts.deps?.blockHash ?? blockHash,
-    blockTxs: opts.deps?.blockTxs ?? blockTxs,
+    fetchBlock: opts.deps?.fetchBlock ?? fetchBlock,
     readBlock: opts.deps?.readBlock ?? readBlock,
     writeBlock: opts.deps?.writeBlock ?? writeBlock,
   };

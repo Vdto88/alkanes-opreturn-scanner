@@ -75,12 +75,23 @@ export async function blockHash(height: number, opts: EsploraOptions = {}): Prom
   return String(await esploraRequest(`/block-height/${height}`, opts));
 }
 
-export async function blockTxs(hash: string, opts: EsploraOptions = {}): Promise<EsploraTx[]> {
-  const info = (await esploraRequest(`/block/${hash}`, opts)) as { tx_count: number };
-  const starts: number[] = [];
-  for (let s = 0; s < (info.tx_count ?? 0); s += 25) starts.push(s);
+export interface BlockInfo {
+  tx_count: number;
+  mediantime: number; // unix segundos (timestamp real do bloco)
+}
 
-  // Páginas em paralelo (concorrência limitada); preserva a ordem via índice.
+export async function blockInfo(hash: string, opts: EsploraOptions = {}): Promise<BlockInfo> {
+  const j = (await esploraRequest(`/block/${hash}`, opts)) as { tx_count?: number; mediantime?: number };
+  return { tx_count: j.tx_count ?? 0, mediantime: j.mediantime ?? 0 };
+}
+
+/** Busca todas as tx do bloco (scriptpubkey-only) + o mediantime real, numa
+ *  única passada. Páginas em paralelo (concorrência limitada). */
+export async function fetchBlock(hash: string, opts: EsploraOptions = {}): Promise<{ txs: EsploraTx[]; mediantime: number }> {
+  const info = await blockInfo(hash, opts);
+  const starts: number[] = [];
+  for (let s = 0; s < info.tx_count; s += 25) starts.push(s);
+
   const pages: EsploraTx[][] = new Array(starts.length);
   const concurrency = Math.max(1, opts.concurrency ?? 8);
   let next = 0;
@@ -91,5 +102,9 @@ export async function blockTxs(hash: string, opts: EsploraOptions = {}): Promise
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, starts.length) }, worker));
-  return pages.flat();
+  return { txs: pages.flat(), mediantime: info.mediantime };
+}
+
+export async function blockTxs(hash: string, opts: EsploraOptions = {}): Promise<EsploraTx[]> {
+  return (await fetchBlock(hash, opts)).txs;
 }

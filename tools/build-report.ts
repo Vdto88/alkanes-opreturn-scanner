@@ -1,12 +1,12 @@
 import { writeFileSync } from 'node:fs';
 import {
-  readHistory, rollup, alkShareCount, alkBytesShare, utcDate, type HistoryRow, type Sums,
+  readHistory, rollup, alkShareCount, alkBytesShare, dieselShareCount, utcDate, type HistoryRow, type Sums,
 } from './history';
 
 // Lê o history.csv e gera report.html (standalone, tema escuro) com:
 //  - rollups (ontem / 7d / 30d / all)
-//  - linha do tempo: média móvel de 7 dias (ponderada por blocos) + pontos diários
-//  - explicação de como é calculado
+//  - linha do tempo DIÁRIA (cada dia tem ~48 blocos amostrados → ponto sólido)
+//  - share de DIESEL (mint 2:0 op77) por dia
 // Uso: tsx tools/build-report.ts [historyPath]
 
 const historyPath = process.argv[2] ?? 'history.csv';
@@ -22,15 +22,8 @@ const mday = (iso: string) => { const [, m, d] = iso.split('-'); return `${MONTH
 
 const sumsOfRow = (r: HistoryRow): Sums => ({
   blocksScanned: r.blocksScanned, totalTx: r.totalTx, txWithOpReturn: r.txWithOpReturn,
-  txAlkanes: r.txAlkanes, opReturnBytes: r.opReturnBytes, alkanesBytes: r.alkanesBytes,
+  txAlkanes: r.txAlkanes, opReturnBytes: r.opReturnBytes, alkanesBytes: r.alkanesBytes, dieselMints: r.dieselMints,
 });
-
-// média móvel de 7 dias ponderada por blocos (= soma das contagens na janela)
-const rollAt = (i: number, num: keyof HistoryRow, den: keyof HistoryRow): number => {
-  let a = 0, b = 0;
-  for (let j = Math.max(0, i - 6); j <= i; j++) { a += rows[j][num] as number; b += rows[j][den] as number; }
-  return b ? a / b : 0;
-};
 
 const all = rollup(rows, '0000-00-00');
 const latest = sumsOfRow(rows[rows.length - 1]);
@@ -40,12 +33,16 @@ const d30 = rollup(rows, utcDate(-29));
 const card = (label: string, s: Sums) =>
   `<div class="card"><div class="l">${label}</div><div class="v">${r1(alkShareCount(s))}%</div><div class="b">${r1(alkBytesShare(s))}% of bytes</div></div>`;
 
+// DIESEL como % das tx Alkanes (mostra que Alkanes ≈ DIESEL) no período inteiro
+const dieselOfAlkanes = all.txAlkanes ? r1(all.dieselMints / all.txAlkanes) : 0;
+// estimativa de mints/dia no full-day (extrapola a amostra: mints/blocosAmostrados × ~144)
+const estDieselPerDay = Math.round((d30.dieselMints / Math.max(1, d30.blocksScanned)) * 144);
+
 const data = {
   labels: rows.map((r) => mday(r.date)),
   txDaily: rows.map((r) => r1(alkShareCount(sumsOfRow(r)))),
-  txRoll: rows.map((_, i) => r1(rollAt(i, 'txAlkanes', 'totalTx'))),
-  bytesRoll: rows.map((_, i) => r1(rollAt(i, 'alkanesBytes', 'opReturnBytes'))),
-  donutAlk: r1(alkBytesShare(all)),
+  bytesDaily: rows.map((r) => r1(alkBytesShare(sumsOfRow(r)))),
+  dieselDaily: rows.map((r) => r1(dieselShareCount(sumsOfRow(r)))),
   span: `${mday(rows[0].date)} – ${mday(rows[rows.length - 1].date)}`,
   days: rows.length,
   totalTx: all.totalTx,
@@ -55,49 +52,45 @@ const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Alkanes — share of Bitcoin OP_RETURN</title>
 <style>
-  :root{--bg:#0b0b0d;--surface:#16161a;--line:#26262c;--text:#ececef;--head:#f6f6f8;--muted:#9a9aa3;--faint:#6f6f78;--teal:#2DBE8E;--purple:#9d94e8}
+  :root{--bg:#0b0b0d;--surface:#16161a;--line:#26262c;--text:#ececef;--head:#f6f6f8;--muted:#9a9aa3;--faint:#6f6f78;--teal:#2DBE8E;--purple:#9d94e8;--amber:#E9A23B}
   *{box-sizing:border-box} body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);max-width:880px;margin:0 auto;padding:2.5rem 1.25rem 3rem;line-height:1.6}
   h1{font-weight:600;font-size:23px;margin:0 0 4px;color:var(--head)} h2{font-weight:600;font-size:16px;margin:2.25rem 0 4px;color:var(--head)}
   .sub{color:var(--muted);font-size:13px;margin:0 0 1.5rem}
-  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:1.25rem 0 1.75rem}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:1.25rem 0 1rem}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1rem 1.1rem}
   .card .l{font-size:13px;color:var(--muted)} .card .v{font-size:27px;font-weight:600;color:var(--head);margin-top:2px} .card .b{font-size:12px;color:var(--faint);margin-top:2px}
+  .note{font-size:13px;color:var(--muted);margin:.25rem 0 0} .note b{color:var(--head);font-weight:600}
   .legend{display:flex;flex-wrap:wrap;gap:16px;margin:8px 0 10px;font-size:12px;color:var(--muted);align-items:center}
   .sw{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:middle}
   .wrap{position:relative;width:100%;height:300px;margin-bottom:1.5rem}
-  .row{display:grid;grid-template-columns:3fr 2fr;gap:28px;align-items:start}
-  .how{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.1rem 1.25rem;margin-top:1.5rem}
+  .how{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.1rem 1.25rem;margin-top:.5rem}
   .how p{margin:0 0 .6rem;font-size:14px;color:var(--text)} .how p:last-child{margin-bottom:0} .how b{color:var(--head);font-weight:600}
   code{font-family:ui-monospace,monospace;background:#222228;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12px;color:#d6d6db}
   a{color:var(--teal)} footer{margin-top:2rem;font-size:12px;color:var(--faint);border-top:1px solid var(--line);padding-top:1rem}
-  @media(max-width:560px){.row{grid-template-columns:1fr}}
 </style></head><body>
 <h1>Alkanes' share of Bitcoin OP_RETURN</h1>
-<p class="sub">${data.span} · ${data.days} days · ${data.totalTx.toLocaleString('en-US')} transactions · updated daily</p>
+<p class="sub">${data.span} · ${data.days} days · ${data.totalTx.toLocaleString('en-US')} transactions sampled · updated daily</p>
 <div class="cards">
   ${card('Latest day', latest)}
   ${card('Last 7 days', d7)}
   ${card('Last 30 days', d30)}
   ${card('All time', all)}
 </div>
+<p class="note">Of all Alkanes activity, <b>${dieselOfAlkanes}%</b> is DIESEL minting (cellpack <code>2:0</code> op&nbsp;77) — roughly <b>${estDieselPerDay.toLocaleString('en-US')}</b> mints/day estimated over the last 30 days.</p>
+
 <h2>Daily Alkanes share</h2>
-<div class="legend"><span><span class="sw" style="background:var(--teal)"></span>OP_RETURN bytes — 7-day avg</span><span><span class="sw" style="background:var(--purple)"></span>Transactions — 7-day avg</span><span><span class="sw" style="background:#4a4658"></span>Transactions — daily</span></div>
+<div class="legend"><span><span class="sw" style="background:var(--teal)"></span>OP_RETURN bytes</span><span><span class="sw" style="background:var(--purple)"></span>Transactions</span></div>
 <div class="wrap"><canvas id="g"></canvas></div>
-<div class="row">
-  <div>
-    <h2 style="margin-top:0">OP_RETURN bytes (all time)</h2>
-    <div class="legend"><span><span class="sw" style="background:var(--teal)"></span>Alkanes</span><span><span class="sw" style="background:#3a3a42"></span>Everything else</span></div>
-    <div class="wrap" style="height:210px"><canvas id="d"></canvas></div>
-  </div>
-  <div>
-    <h2 style="margin-top:0">How it's calculated</h2>
-    <div class="how">
-      <p>We read every Bitcoin block in the window and inspect each transaction's outputs. An output whose script starts with <code>6a</code> is an <b>OP_RETURN</b>; one starting <code>6a5d</code> is a Runestone.</p>
-      <p>We decode the Runestone and if any protostone carries <b>protocol_tag = 1</b>, the transaction is <b>Alkanes</b>.</p>
-      <p><b>Share of transactions</b> = Alkanes tx ÷ all tx. <b>Share of OP_RETURN bytes</b> = Alkanes OP_RETURN bytes ÷ all OP_RETURN bytes (the data-volume view, steadier).</p>
-      <p>Each daily point is a <b>sample</b> of that day's ~144 blocks (see <code>blocksScanned</code> in the CSV), not all of them — so a thin day swings a lot. The <b>7-day average</b> and the cards aggregate many blocks and show the real trend. Classification reuses the open-source <a href="https://github.com/Vdto88/alkanes-opreturn-decoder">alkanes-opreturn-decoder</a>.</p>
-    </div>
-  </div>
+
+<h2>DIESEL mints — share of all Bitcoin transactions</h2>
+<div class="legend"><span><span class="sw" style="background:var(--amber)"></span>DIESEL mints (% of all tx)</span></div>
+<div class="wrap" style="height:240px"><canvas id="m"></canvas></div>
+
+<h2>How it's calculated</h2>
+<div class="how">
+  <p>We read every Bitcoin block in the window and inspect each transaction's outputs. An output whose script starts with <code>6a</code> is an <b>OP_RETURN</b>; one starting <code>6a5d</code> is a Runestone.</p>
+  <p>We decode the Runestone and if any protostone carries <b>protocol_tag = 1</b>, the transaction is <b>Alkanes</b>. A <b>DIESEL mint</b> is the specific case where the cellpack targets <code>2:0</code> with opcode <code>77</code> (the genesis alkane) — today that's the vast majority of all Alkanes activity.</p>
+  <p><b>Share of transactions</b> = matching tx ÷ all tx. <b>Share of OP_RETURN bytes</b> = Alkanes OP_RETURN bytes ÷ all OP_RETURN bytes. Shares are unaffected by sampling; each day rests on ~24-48 sampled blocks (see <code>blocksScanned</code> in the CSV). Classification reuses the open-source <a href="https://github.com/Vdto88/alkanes-opreturn-decoder">alkanes-opreturn-decoder</a>.</p>
 </div>
 <footer>Source data: <a href="./history.csv">history.csv</a> (one row per day). Bytes = full output script; coinbase included. Auto-updated daily from the alkanes-opreturn-scanner.</footer>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -106,12 +99,13 @@ const D=${JSON.stringify(data)};
 Chart.defaults.color='#9a9aa3'; Chart.defaults.font.family='system-ui,sans-serif';
 const pc=v=>v+'%', grid='rgba(255,255,255,0.07)';
 new Chart(g,{type:'line',data:{labels:D.labels,datasets:[
- {label:'Transactions — daily',data:D.txDaily,borderColor:'transparent',backgroundColor:'rgba(157,148,232,0.45)',showLine:false,pointRadius:1.8},
- {label:'OP_RETURN bytes — 7-day avg',data:D.bytesRoll,borderColor:'#2DBE8E',fill:false,pointRadius:0,tension:.35,borderWidth:2.5},
- {label:'Transactions — 7-day avg',data:D.txRoll,borderColor:'#9d94e8',fill:false,pointRadius:0,tension:.35,borderWidth:2.5}]},
+ {label:'OP_RETURN bytes',data:D.bytesDaily,borderColor:'#2DBE8E',fill:false,pointRadius:1.5,tension:.25,borderWidth:2},
+ {label:'Transactions',data:D.txDaily,borderColor:'#9d94e8',fill:false,pointRadius:1.5,tension:.25,borderWidth:2}]},
  options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y+'%'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
-new Chart(d,{type:'doughnut',data:{labels:['Alkanes','Everything else'],datasets:[{data:[D.donutAlk,+(100-D.donutAlk).toFixed(1)],backgroundColor:['#2DBE8E','#3a3a42'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'64%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.parsed+'%'}}}}});
+new Chart(m,{type:'line',data:{labels:D.labels,datasets:[
+ {label:'DIESEL mints',data:D.dieselDaily,borderColor:'#E9A23B',backgroundColor:'rgba(233,162,59,0.12)',fill:true,pointRadius:1.5,tension:.25,borderWidth:2}]},
+ options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'% of all tx'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
 </script></body></html>`;
 
 writeFileSync('report.html', html);
-console.log(`report.html (dark): ${data.days} dias (${data.span}) · 7d tx=${r1(alkShareCount(d7))}% · 30d tx=${r1(alkShareCount(d30))}%`);
+console.log(`report.html: ${data.days} dias (${data.span}) · 30d tx=${r1(alkShareCount(d30))}% · DIESEL=${dieselOfAlkanes}% das Alkanes · ~${estDieselPerDay}/dia`);

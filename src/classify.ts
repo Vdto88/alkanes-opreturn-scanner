@@ -11,7 +11,12 @@ export interface TxClass {
   isAlkanes: boolean;
   alkanesBytes: number;
   decodeFailed: boolean;
+  isDieselMint: boolean; // cellpack target 2:0 opcode 77 (mint do genesis alkane DIESEL)
 }
+
+const DIESEL_BLOCK = 2n;
+const DIESEL_TX = 0n;
+const DIESEL_MINT_OPCODE = 77n;
 
 /** Classifica uma tx pelos scriptPubKeys dos vouts. Pura, offline.
  *  OP_RETURN = prefixo 6a; runestone = 6a5d; Alkanes = decodeOpReturn com
@@ -21,6 +26,7 @@ export function classifyTx(vouts: Vout[]): TxClass {
   let hasRunestone = false;
   let isAlkanes = false;
   let decodeFailed = false;
+  let isDieselMint = false;
   let opReturnBytes = 0;
   let alkanesBytes = 0;
 
@@ -38,10 +44,15 @@ export function classifyTx(vouts: Vout[]): TxClass {
         isAlkanes = true;
         alkanesBytes += bytes;
       }
+      if (r.protostones.some((p) => p.isAlkanes && p.cellpack
+        && p.cellpack.target.block === DIESEL_BLOCK && p.cellpack.target.tx === DIESEL_TX
+        && p.cellpack.opcode === DIESEL_MINT_OPCODE)) {
+        isDieselMint = true;
+      }
     } catch {
       decodeFailed = true;
     }
   });
 
-  return { hasOpReturn, opReturnBytes, hasRunestone, isAlkanes, alkanesBytes, decodeFailed };
+  return { hasOpReturn, opReturnBytes, hasRunestone, isAlkanes, alkanesBytes, decodeFailed, isDieselMint };
 }

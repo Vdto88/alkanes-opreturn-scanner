@@ -13,23 +13,42 @@ export interface HistoryRow {
   txAlkanes: number;
   opReturnBytes: number;
   alkanesBytes: number;
+  dieselMints: number; // tx que são mint de DIESEL (cellpack 2:0 op77)
 }
 
 const COLS: (keyof HistoryRow)[] = [
-  'date', 'fromHeight', 'toHeight', 'blocksScanned', 'totalTx', 'txWithOpReturn', 'txAlkanes', 'opReturnBytes', 'alkanesBytes',
+  'date', 'fromHeight', 'toHeight', 'blocksScanned', 'totalTx', 'txWithOpReturn', 'txAlkanes', 'opReturnBytes', 'alkanesBytes', 'dieselMints',
 ];
 
 export function readHistory(path: string): HistoryRow[] {
   if (!existsSync(path)) return [];
   const lines = readFileSync(path, 'utf8').trim().split(/\r?\n/);
   if (lines.length <= 1) return [];
+  const header = lines[0].split(',');
+  // Parse por NOME de coluna (não posição): colunas novas ausentes viram 0,
+  // então CSVs antigos (sem dieselMints) continuam legíveis.
   return lines.slice(1).filter((l) => l.trim()).map((line) => {
     const cells = line.split(',');
-    const row = {} as HistoryRow;
-    COLS.forEach((c, i) => {
-      (row as Record<string, unknown>)[c] = c === 'date' ? cells[i] : Number(cells[i]);
-    });
-    return row;
+    const at = (col: string): string | undefined => {
+      const i = header.indexOf(col);
+      return i >= 0 ? cells[i] : undefined;
+    };
+    const num = (col: string): number => {
+      const v = at(col);
+      return v !== undefined && v !== '' ? Number(v) : 0;
+    };
+    return {
+      date: at('date') ?? '',
+      fromHeight: num('fromHeight'),
+      toHeight: num('toHeight'),
+      blocksScanned: num('blocksScanned'),
+      totalTx: num('totalTx'),
+      txWithOpReturn: num('txWithOpReturn'),
+      txAlkanes: num('txAlkanes'),
+      opReturnBytes: num('opReturnBytes'),
+      alkanesBytes: num('alkanesBytes'),
+      dieselMints: num('dieselMints'),
+    };
   });
 }
 
@@ -47,16 +66,17 @@ export function upsert(rows: HistoryRow[], row: HistoryRow): HistoryRow[] {
 }
 
 export interface Sums {
-  blocksScanned: number; totalTx: number; txWithOpReturn: number; txAlkanes: number; opReturnBytes: number; alkanesBytes: number;
+  blocksScanned: number; totalTx: number; txWithOpReturn: number; txAlkanes: number; opReturnBytes: number; alkanesBytes: number; dieselMints: number;
 }
 
 /** Soma as linhas com date >= sinceDate (inclusive). */
 export function rollup(rows: HistoryRow[], sinceDate: string): Sums {
-  const s: Sums = { blocksScanned: 0, totalTx: 0, txWithOpReturn: 0, txAlkanes: 0, opReturnBytes: 0, alkanesBytes: 0 };
+  const s: Sums = { blocksScanned: 0, totalTx: 0, txWithOpReturn: 0, txAlkanes: 0, opReturnBytes: 0, alkanesBytes: 0, dieselMints: 0 };
   for (const r of rows) {
     if (r.date < sinceDate) continue;
     s.blocksScanned += r.blocksScanned; s.totalTx += r.totalTx; s.txWithOpReturn += r.txWithOpReturn;
     s.txAlkanes += r.txAlkanes; s.opReturnBytes += r.opReturnBytes; s.alkanesBytes += r.alkanesBytes;
+    s.dieselMints += r.dieselMints;
   }
   return s;
 }
@@ -64,6 +84,7 @@ export function rollup(rows: HistoryRow[], sinceDate: string): Sums {
 export const alkShareCount = (s: Sums): number => (s.totalTx ? s.txAlkanes / s.totalTx : 0);
 export const alkBytesShare = (s: Sums): number => (s.opReturnBytes ? s.alkanesBytes / s.opReturnBytes : 0);
 export const opReturnShare = (s: Sums): number => (s.totalTx ? s.txWithOpReturn / s.totalTx : 0);
+export const dieselShareCount = (s: Sums): number => (s.totalTx ? s.dieselMints / s.totalTx : 0);
 
 /** Data UTC (YYYY-MM-DD) deslocada por `days` a partir de hoje. */
 export function utcDate(days = 0): string {

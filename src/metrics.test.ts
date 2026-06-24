@@ -9,6 +9,7 @@ describe('computeMetrics', () => {
       txAlkanes: 80,
       opReturnBytesTotal: 10000,
       alkanesBytesTotal: 9100,
+      dieselMints: 70,
     };
     const m = computeMetrics(a);
     expect(m.opReturnShareByCount).toBeCloseTo(0.2);       // 200/1000

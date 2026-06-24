@@ -3,15 +3,21 @@ name: dense backfill (one-off)
 on:
   workflow_dispatch:
     inputs:
-      blocks:
-        description: "Quantos blocos recentes abranger"
-        default: "8640"
+      from:
+        description: "Altura inicial do range"
+        required: true
+      to:
+        description: "Altura final do range"
+        required: true
       sample:
-        description: "Escanear 1 a cada N blocos (3 ≈ 48/dia)"
-        default: "3"
+        description: "Escanear 1 a cada N blocos (6 ≈ 24/dia)"
+        default: "6"
       concurrency:
         description: "Páginas em paralelo por bloco"
         default: "20"
+      merge:
+        description: "Acumular no history existente (true) ou recomeçar do zero (false)"
+        default: "true"
 
 permissions:
   contents: write
@@ -35,13 +41,18 @@ jobs:
       - name: Install deps
         run: npm install --no-audit --no-fund
 
-      - name: Dense scan (popula o cache)
+      - name: Dense scan (popula o cache, com timestamp real)
         env:
           SUBFROST_KEY: ${{ secrets.SUBFROST_KEY }}
-        run: npx tsx src/cli.ts --blocks ${{ inputs.blocks }} --sample ${{ inputs.sample }} --concurrency ${{ inputs.concurrency }}
+        run: npx tsx src/cli.ts --from ${{ inputs.from }} --to ${{ inputs.to }} --sample ${{ inputs.sample }} --concurrency ${{ inputs.concurrency }}
 
       - name: Rebuild history.csv from cache
-        run: npx tsx tools/seed-history.ts
+        run: |
+          if [ "${{ inputs.merge }}" = "true" ]; then
+            npx tsx tools/seed-history.ts cache history.csv --merge
+          else
+            npx tsx tools/seed-history.ts cache history.csv
+          fi
 
       - name: Build report
         run: npx tsx tools/build-report.ts
@@ -75,6 +86,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add history.csv report.html
-          git diff --cached --quiet || git commit -m "chore: dense backfill (sample ${{ inputs.sample }})"
+          git diff --cached --quiet || git commit -m "chore: dense backfill ${{ inputs.from }}-${{ inputs.to }}"
           git pull --rebase --autostash origin master || true
           git push

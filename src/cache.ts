@@ -5,6 +5,7 @@ import type { ScanAggregate } from './metrics';
 export interface BlockResult {
   height: number;
   hash: string;
+  time: number; // mediantime do bloco (unix s) — pra datar com precisão
   aggregate: ScanAggregate;
   decodeFailures: number;
 }

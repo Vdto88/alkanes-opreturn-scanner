@@ -11,7 +11,8 @@ describe('cache', () => {
     const r: BlockResult = {
       height: 800000,
       hash: 'abcd',
-      aggregate: { totalTx: 3, txWithOpReturn: 2, txAlkanes: 1, opReturnBytesTotal: 50, alkanesBytesTotal: 29 },
+      time: 1782000000,
+      aggregate: { totalTx: 3, txWithOpReturn: 2, txAlkanes: 1, opReturnBytesTotal: 50, alkanesBytesTotal: 29, dieselMints: 1 },
       decodeFailures: 0,
     };
     writeBlock(dir, r);
