@@ -4,8 +4,10 @@ import type { ScanResult } from './scan';
 import type { Metrics } from './metrics';
 
 const result: ScanResult = {
-  aggregate: { totalTx: 1000, txWithOpReturn: 200, txAlkanes: 80, opReturnBytesTotal: 10000, alkanesBytesTotal: 9100 },
+  aggregate: { totalTx: 1000, txWithOpReturn: 200, txAlkanes: 80, opReturnBytesTotal: 10000, runestoneBytesTotal: 9500, alkanesBytesTotal: 9100, dieselMints: 70, feeTotalSats: 0, feeAlkanesSats: 0, feeOpReturnSats: 0 },
   decodeFailures: 1,
+  blocksFailed: 0,
+  nonDieselTargets: {},
   coverage: { fromHeight: 100, toHeight: 149, blocksScanned: 50, sampled: false, sampleEvery: 1, totalTx: 1000, txWithOpReturn: 200, txAlkanes: 80 },
 };
 const metrics: Metrics = {
