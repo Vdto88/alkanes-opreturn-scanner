@@ -2,6 +2,10 @@ import { readFileSync } from 'node:fs';
 import { scanRange } from '../src/scan';
 import { tipHeight, type Source } from '../src/esplora';
 import { readHistory, writeHistory, upsert, utcDate, type HistoryRow } from './history';
+import { readContracts, writeContracts, upsertContracts } from './contracts';
+import { fetchDay } from './price';
+
+const contractsPath = 'contracts-daily.json';
 
 // Escaneia uma janela recente e grava/atualiza a linha de HOJE no history.csv.
 // Pensado pra rodar 1x/dia (GitHub Actions). Uso:
@@ -49,10 +53,18 @@ const row: HistoryRow = {
   runestoneBytes: a.runestoneBytesTotal,
   alkanesBytes: a.alkanesBytesTotal,
   dieselMints: a.dieselMints,
+  feeTotalSats: a.feeTotalSats,
+  feeAlkanesSats: a.feeAlkanesSats,
+  feeOpReturnSats: a.feeOpReturnSats,
+  btcUsd: 0,
 };
+try { row.btcUsd = await fetchDay(row.date); } catch (e) { console.error(`preço BTC/USD indisponível: ${String(e)}`); }
 
 const rows = upsert(readHistory(historyPath), row);
 writeHistory(historyPath, rows);
+
+// contratos não-DIESEL do dia (upsert no registro durável)
+writeContracts(contractsPath, upsertContracts(readContracts(contractsPath), { date: row.date, targets: result.nonDieselTargets }));
 
 const pc = (n: number, d: number) => (d ? (n / d * 100).toFixed(2) : '0') + '%';
 console.log(`${row.date}: ${row.totalTx} tx | tx=Alkanes ${pc(row.txAlkanes, row.totalTx)} | bytes=Alkanes ${pc(row.alkanesBytes, row.opReturnBytes)} (${rows.length} dias no histórico)`);
