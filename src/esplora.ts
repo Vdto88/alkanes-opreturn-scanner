@@ -6,6 +6,10 @@ export interface EsploraOptions {
   fetchImpl?: typeof fetch;
   /** páginas de tx buscadas em paralelo por bloco (default 8). */
   concurrency?: number;
+  /** tentativas por request antes de desistir (default 5). */
+  attempts?: number;
+  /** espera-base entre tentativas, em ms, com backoff exponencial (default 300; 0 = sem espera). */
+  backoffMs?: number;
 }
 
 export interface EsploraTx {
@@ -25,27 +29,35 @@ export function pathToSubfrostMethod(path: string): string {
   return 'esplora_' + path.replace(/^\//, '').replace(/\//g, ':');
 }
 
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
 /** Faz 1 request esplora e devolve o `result` parseado (number|string|object|array).
- *  subfrost = JSON-RPC POST; mempool/alkanode = REST GET. Até 3 tentativas
- *  (cobre HTTP transiente e o -32603 do gateway subfrost). */
-async function esploraRequest(path: string, opts: EsploraOptions, attempts = 3): Promise<unknown> {
+ *  subfrost = JSON-RPC POST; mempool/alkanode = REST GET. Tenta `attempts` vezes
+ *  (default 5) com backoff exponencial: cobre HTTP transiente e erros do gateway
+ *  subfrost (-32603 e afins). Um soluço breve não pode derrubar um scan de horas. */
+async function esploraRequest(path: string, opts: EsploraOptions): Promise<unknown> {
   const f = opts.fetchImpl ?? fetch;
   const source = opts.source ?? 'subfrost';
+  const attempts = Math.max(1, opts.attempts ?? 5);
+  const backoffMs = opts.backoffMs ?? 300;
+  // erro de config (não transiente): falha rápido, sem gastar retries
+  if (source === 'subfrost' && !opts.subfrostKey) throw new Error('subfrostKey obrigatória para source subfrost');
   let lastErr: unknown;
 
   for (let i = 0; i < attempts; i++) {
+    if (i > 0 && backoffMs > 0) await sleep(backoffMs * 2 ** (i - 1)); // 300, 600, 1200, 2400ms...
     try {
       if (source === 'subfrost') {
-        if (!opts.subfrostKey) throw new Error('subfrostKey obrigatória para source subfrost');
         const res = await f(`https://mainnet.subfrost.io/v4/${opts.subfrostKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ jsonrpc: '2.0', id: 0, method: pathToSubfrostMethod(path), params: [] }),
         });
-        const json = JSON.parse((await res.text()).trim()) as { result?: unknown; error?: { code: number } };
+        const json = JSON.parse((await res.text()).trim()) as { result?: unknown; error?: { code?: number; message?: string } };
         if (json.error) {
-          lastErr = new Error(`JSON-RPC ${json.error.code}`);
-          continue; // -32603 transiente -> retry
+          // pode vir sem `code` (só `message`, ou outra forma) — mensagem legível p/ não logar "undefined"
+          lastErr = new Error(`JSON-RPC ${json.error.code ?? json.error.message ?? JSON.stringify(json.error)}`);
+          continue; // transiente -> retry
         }
         return json.result;
       }

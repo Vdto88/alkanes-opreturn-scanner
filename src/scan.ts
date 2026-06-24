@@ -18,6 +18,7 @@ export interface ScanResult {
   aggregate: ScanAggregate;
   coverage: Coverage;
   decodeFailures: number;
+  blocksFailed: number; // blocos pulados por erro de fetch (após retries) — não derrubam o range
 }
 
 export interface ScanDeps {
@@ -77,21 +78,30 @@ export async function scanRange(fromHeight: number, toHeight: number, opts: Scan
   const total = emptyAggregate();
   let decodeFailures = 0;
   let blocksScanned = 0;
+  let blocksFailed = 0;
 
   for (let h = fromHeight; h <= toHeight; h += sampleEvery) {
-    let block = useCache ? deps.readBlock(cacheDir, h) : null;
-    if (!block) {
-      block = await scanBlock(h, opts, deps);
-      deps.writeBlock(cacheDir, block);
+    try {
+      let block = useCache ? deps.readBlock(cacheDir, h) : null;
+      if (!block) {
+        block = await scanBlock(h, opts, deps);
+        deps.writeBlock(cacheDir, block);
+      }
+      add(total, block.aggregate);
+      decodeFailures += block.decodeFailures;
+      blocksScanned += 1;
+    } catch (e) {
+      // 1 bloco falho (após os retries do esplora) não pode descartar horas de scan;
+      // como é amostrado, pular um bloco é estatisticamente irrelevante.
+      blocksFailed += 1;
+      console.error(`bloco ${h} falhou, pulando: ${String(e)}`);
     }
-    add(total, block.aggregate);
-    decodeFailures += block.decodeFailures;
-    blocksScanned += 1;
   }
 
   return {
     aggregate: total,
     decodeFailures,
+    blocksFailed,
     coverage: {
       fromHeight,
       toHeight,

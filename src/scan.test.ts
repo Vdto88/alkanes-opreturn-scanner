@@ -65,4 +65,27 @@ describe('scanRange', () => {
     expect(r.coverage.sampled).toBe(true);
     expect(r.coverage.blocksScanned).toBe(2); // 100 e 102
   });
+
+  it('pula bloco que falha (depois dos retries) e continua o range', async () => {
+    const blocks: Record<number, EsploraTx[]> = {
+      100: [{ txid: 'a', vout: [] }],
+      102: [{ txid: 'c', vout: [] }],
+    };
+    const r = await scanRange(100, 102, {
+      useCache: false,
+      deps: {
+        blockHash: async (h: number) => `hash${h}`,
+        fetchBlock: async (hash: string) => {
+          const h = Number(hash.replace('hash', ''));
+          if (h === 101) throw new Error('esplora request falhou /block/hash101/txs/0: boom');
+          return { txs: blocks[h] ?? [], mediantime: 1782000000 };
+        },
+        readBlock: () => null,
+        writeBlock: () => {},
+      },
+    });
+    expect(r.coverage.blocksScanned).toBe(2); // 100 e 102 contam
+    expect(r.blocksFailed).toBe(1);           // 101 foi pulado, não derrubou o range
+    expect(r.aggregate.totalTx).toBe(2);
+  });
 });

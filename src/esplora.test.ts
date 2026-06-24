@@ -51,6 +51,29 @@ describe('tipHeight', () => {
     expect(await tipHeight({ source: 'subfrost', subfrostKey: 'K', fetchImpl: f })).toBe(850001);
     expect(n).toBe(2);
   });
+
+  it('sobrevive a 4 falhas transientes seguidas e depois sucesso', async () => {
+    let n = 0;
+    const f = (async () => {
+      n++;
+      const body = n <= 4
+        ? '{"jsonrpc":"2.0","error":{"code":-32603},"id":0}'
+        : '{"jsonrpc":"2.0","result":850002,"id":0}';
+      return { ok: true, status: 200, text: async () => body } as Response;
+    }) as unknown as typeof fetch;
+    expect(await tipHeight({ source: 'subfrost', subfrostKey: 'K', fetchImpl: f, backoffMs: 0 })).toBe(850002);
+    expect(n).toBe(5);
+  });
+
+  it('erro do subfrost sem code: ainda dá retry e a mensagem é legível (não "undefined")', async () => {
+    let n = 0;
+    const f = (async () => {
+      n++;
+      return { ok: true, status: 200, text: async () => '{"jsonrpc":"2.0","error":{"message":"boom"},"id":0}' } as Response;
+    }) as unknown as typeof fetch;
+    await expect(tipHeight({ source: 'subfrost', subfrostKey: 'K', fetchImpl: f, backoffMs: 0 })).rejects.toThrow(/boom/);
+    expect(n).toBeGreaterThan(1); // tentou de novo, não desistiu na primeira
+  });
 });
 
 describe('blockTxs', () => {
