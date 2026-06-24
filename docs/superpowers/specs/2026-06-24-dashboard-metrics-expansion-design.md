@@ -1,119 +1,111 @@
-# Design — Expansão de métricas do dashboard (OP_RETURN penetration, Runes toggle, fees/miners)
+# Design — Fase 2: fees/miners + top contratos não-DIESEL
 
-**Data:** 2026-06-24
-**Status:** aprovado (design); aguardando revisão do spec → plano de implementação
+**Data:** 2026-06-24 (revisado — substitui a versão anterior que cobria só fees)
+**Status:** design aprovado pelo usuário → escrevendo plano da 2a
 
 ## Contexto
 
-O dashboard (`build-report.ts` → `report.html` → Pages) hoje mostra: share de Alkanes em tx e bytes
-(cards ontem/7d/30d/all), linha diária de Alkanes (bytes+tx), linha de DIESEL, e a rosca
-Alkanes/Runes/Other (all-time). Dados vêm do `history.csv` (1 linha/dia, ~178 dias Dez 29→agora).
+Depois da Fase 1 (penetration, Runes, Alkanes-sem-DIESEL) e Fase 1.5 (clareza, legenda clicável),
+a Fase 2 adiciona dois temas que precisam de **dados novos** (logo, um re-scan):
+1. **Fees / receita dos miners** em **USD+BTC** ao longo do tempo, e quanto vem de Alkanes/OP_RETURN.
+2. **Top contratos não-DIESEL** — ranking all-time dos contratos Alkanes mais usados fora do mint de
+   DIESEL (surfaça swaps do subfrost + "protocolo mais usado"), com nomes amigáveis.
 
-O usuário quer **3 acréscimos** (escolhidos de um menu de ideias):
-1. **% das tx de BTC que carregam OP_RETURN** — o número-base do kickoff, hoje ausente.
-2. **Linha diária de Runes (liga/desliga)** + **linha "Alkanes sem DIESEL"** — foco é Alkanes, mas o
-   dado de Runes é interessante de poder ligar.
-3. **Fees / receita dos miners** — quanto os miners ganham de fee, **como cresceu ao longo do tempo**,
-   e **quanto dessa receita vem de Alkanes/OP_RETURN**. Em **USD (+ BTC)**.
+## Decisões (brainstorming)
 
-## Decisões já tomadas (brainstorming)
+- **Fees:** USD **e** BTC (preço via CoinGecko: range no backfill + 1×/dia no daily). Re-backfill do
+  período inteiro (cache só guarda agregado, não fee por tx).
+- **0,2% não-DIESEL:** **por contrato-alvo** (top N all-time, com rótulos amigáveis), **não** por
+  tipo de ação. Motivo: opcode é específico do contrato (não há "opcode = swap" universal); agregar
+  por alvo surfaça os pools/AMM do subfrost sozinhos, sem manter lista frágil.
+- **Split:** **2a (fees)** primeiro, **2b (contratos)** depois. **Uma única varredura** captura os
+  dados dos dois (fee + alvo), então a captura no scanner e o re-scan ficam na 2a; a 2b é só relatório.
+- Subsídio do bloco = **3,125 BTC** (constante: blocos 930000–955153 ficam entre os halvings de
+  840000 e 1050000).
 
-- **Unidade de fee:** USD **e** BTC. USD precisa de histórico diário de preço do BTC → CoinGecko
-  (range único no backfill + 1×/dia no daily).
-- **Histórico de fees:** **re-backfillar** o período inteiro capturando fees agora (≈5h de scan,
-  automático), porque a curva de crescimento é justamente a história. (Alternativa "fees só daqui pra
-  frente" foi rejeitada: gráfico começaria vazio.)
-- **Toggle de Runes:** começa **visível**, com checkbox pra esconder.
+## Captura no scanner (compartilhada — entra na 2a, habilita 1 re-scan só)
 
-## Faseamento
+- **`src/esplora.ts`**: `EsploraTx` ganha `fee?: number` (sats) e `is_coinbase?: boolean`. O esplora já
+  devolve ambos na mesma resposta `/block/<h>/txs/<i>` (verificado) — custo zero de rede.
+- **`src/classify.ts`**: `TxClass` ganha `nonDieselTarget?: string` — o alvo `"block:tx"` do cellpack
+  quando a tx é Alkanes e **não** é mint de DIESEL e tem cellpack (primeiro protostone Alkanes com
+  cellpack). Usa o `p.cellpack.target.block`/`.tx` que o decoder já expõe.
+- **`src/metrics.ts`**: `ScanAggregate` ganha `feeTotalSats`, `feeAlkanesSats`, `feeOpReturnSats`.
+- **`src/scan.ts`**: `scanBlock` soma fees por tx (coinbase = 0; se `isAlkanes` → `feeAlkanesSats`; se
+  `hasOpReturn` → `feeOpReturnSats`) e monta um mapa por bloco `nonDieselTargets: Record<string,number>`
+  (conta cada `nonDieselTarget`). `BlockResult` (cache) ganha esses campos — assim é reconstruível.
 
-A entrega é dividida porque **2 das 3 features não precisam de scan novo** (o dado já está no
-`history.csv`); só fees precisa de colunas novas + re-backfill.
+## Dados duráveis
 
-### Fase 1 — ganhos imediatos (só relatório, sem re-scan)
+- **`history.csv`** ganha colunas: `feeTotalSats`, `feeAlkanesSats`, `feeOpReturnSats`, `btcUsd`.
+  (Parser já lê por nome com default 0 → CSV antigo segue válido.)
+- **`contracts-daily.json`** (novo, durável, committed): array `{date, targets:{"block:tx":count}}`,
+  **upsert por data** (igual ao history.csv). Cardinalidade variável não cabe em coluna fixa; este
+  arquivo é o registro durável dos alvos não-DIESEL por dia. Backfill reconstrói do cache; daily faz
+  upsert do dia. Módulo novo `tools/contracts.ts` (read/write/upsert + `topTargets(rows, n)`), com testes.
+- **Preço BTC/USD:** módulo novo `tools/price.ts` — `fetchRange(from,to)` (CoinGecko
+  `/coins/bitcoin/market_chart/range`, 1 chamada no backfill) e `fetchDay(date)` (daily). `fetchImpl`
+  injetável → testável sem rede.
 
-Tudo derivado de colunas que já existem (`txWithOpReturn`, `totalTx`, `runestoneBytes`, `txAlkanes`,
-`dieselMints`). Publica no próximo daily (ou disparo manual do build).
+## Pipelines
 
-**1a. OP_RETURN penetration** — `% = txWithOpReturn / totalTx`.
-- `history.ts` já tem `opReturnShare(s)`. Surgir no relatório como **um card novo** ("OP_RETURN tx —
-  % de todas as tx do BTC", com all/7d/30d) e como **linha diária** no gráfico de share.
-- Contextualiza o painel e conecta com o ~43,6% do Dune (thread aberta de reconciliação).
+- **`tools/seed-history.ts`** (backfill rebuild do cache): além das linhas de history (com fees), emite
+  `contracts-daily.json` (datando os `nonDieselTargets` por dia) e preenche `btcUsd` por dia via
+  `price.fetchRange`.
+- **`tools/snapshot.ts`** (daily): além da linha do dia (com fees), faz upsert do dia em
+  `contracts-daily.json` e preenche `btcUsd` via `price.fetchDay`.
 
-**1b. Linhas extras no gráfico diário** (`#g`):
-- **Runes (bytes/dia)** = `runesBytesShare(row)` — já existe em `history.ts`.
-- **Alkanes sem DIESEL (tx/dia)** = `(txAlkanes − dieselMints) / totalTx` — helper novo
-  `alkExDieselShareCount(s)` em `history.ts` (+ teste).
-- **Toggle:** checkboxes acima do gráfico (`Mostrar Runes`, `Mostrar Alkanes s/ DIESEL`) que chamam
-  `chart.setDatasetVisibility(i, on); chart.update()`. Combina com as legendas HTML atuais
-  (`legend:{display:false}` no Chart.js). Runes default **on**.
+## Relatório (`tools/build-report.ts`)
 
-### Fase 2 — fees & miners (colunas novas + re-backfill + preço)
+### 2a — Fees / receita dos miners
+- **Métricas derivadas** (em `history.ts`/`metrics.ts`, com testes):
+  - `feeDayBtc = feeTotalSats/blocksScanned × 144 / 1e8` (extrapola a amostra pro dia cheio).
+  - `minerRevenueUsdDay = (feeDayBtc + 144 × 3.125) × btcUsd` (fees + subsídio, em USD).
+  - `feeAlkanesShare = feeAlkanesSats / feeTotalSats`; `feeOpReturnShare = feeOpReturnSats / feeTotalSats`.
+- **Gráfico** "Miner fee revenue (USD/day)" ao longo do tempo (linha/área); tooltip mostra BTC.
+- **Card/nota** "% da receita de fees que é Alkanes/OP_RETURN" (all-time/30d).
+- Nota de metodologia (extrapolação + subsídio), no estilo das notas atuais.
 
-**2a. Captura de fee (custo zero de rede — mesma resposta do esplora):**
-- `EsploraTx` ganha `fee?: number` e `is_coinbase?: boolean` (`esplora.ts`). O fetch já recebe esses
-  campos; hoje são descartados.
-- `ScanAggregate` (`metrics.ts`) ganha `feeTotalSats`, `feeAlkanesSats`, `feeOpReturnSats`.
-- `scanBlock` (`scan.ts`): por tx, soma `tx.fee` em `feeTotalSats` (coinbase tem fee 0/ausente → 0);
-  se `isAlkanes` soma em `feeAlkanesSats`; se `hasOpReturn` soma em `feeOpReturnSats`. (Classificação
-  já existe; só adicionar a atribuição de fee.)
+### 2b — Top contratos não-DIESEL
+- Tabela/ranking all-time (de `contracts-daily.json` via `topTargets`) dos contratos não-DIESEL mais
+  usados: `block:tx` + nome amigável + contagem.
+- **Mapa de rótulos** estático em `build-report.ts` (ou `tools/labels.json`), semeado do que sabemos:
+  `2:0`→"DIESEL", `2:77087`→"subfrost DIESEL/frBTC pool"; alvos sem rótulo aparecem como `block:tx`.
+  Ampliável depois sem afetar a correção.
+- Top N = 12 (ajustável).
 
-**2b. Preço do BTC (USD):**
-- Novo `tools/price.ts`: busca preço diário (USD) do BTC. Duas entradas: range (backfill, 1 chamada
-  CoinGecko `/coins/bitcoin/market_chart/range`) e dia único (daily, `/simple/price` ou history).
-  `fetchImpl` injetável → testável sem rede.
-- `HistoryRow` ganha `btcUsd` (preço de fechamento/representativo do dia). `seed-history.ts`/`snapshot.ts`
-  preenchem por data (join preço×dia). Coluna ausente em CSV antigo → 0 (padrão do parser por nome).
+## Re-scan
 
-**2c. Colunas novas em `history.csv`:** `feeTotalSats`, `feeAlkanesSats`, `feeOpReturnSats`, `btcUsd`.
-(O parser já lê por nome e default 0, então CSVs antigos continuam válidos.)
-
-**2d. Métricas derivadas (`history.ts`/`metrics.ts`, com testes):**
-- **Fees do dia (extrapolado):** `feeDayBtc = feeTotalSats/blocksScanned × 144 / 1e8`.
-- **Receita total do miner/dia:** `feeDayBtc + 144 × 3.125` (subsídio constante: todos os blocos
-  930000–955153 estão entre os halvings de 840000 e 1050000). Em USD: `× btcUsd`.
-- **Share das fees:** `feeAlkanesSats/feeTotalSats` e `feeOpReturnSats/feeTotalSats`.
-
-**2e. UI (`build-report.ts`):**
-- **Gráfico "Receita de fees dos miners"** (USD/dia) ao longo do tempo; tooltip mostra BTC também.
-  Opcional: empilhar/destacar a fatia "vinda de Alkanes/OP_RETURN".
-- **Card/nota "% da receita de fees que é Alkanes/OP_RETURN"** (all/30d).
-- Nota de metodologia explícita (extrapolação da amostra + subsídio), no estilo das notas atuais.
-
-**2f. Re-backfill:** o `cache/` guarda só agregado (`BlockResult`), não tx cru → fees **não estão no
-cache**, exige re-scan. Rodar `backfill.yml` de novo (mesmos blocos 930000→955153) depois do código de
-fee mergeado; preço backfillado pelo `price.ts`. ~5h, automático, publica sozinho ao terminar.
-
-## Arquivos afetados
-
-| Arquivo | Fase | Mudança |
-|---|---|---|
-| `tools/build-report.ts` | 1,2 | cards/linhas/gráficos novos + toggles + nota |
-| `tools/history.ts` | 1,2 | helper `alkExDieselShareCount`; colunas fee/btcUsd; métricas de fee |
-| `src/esplora.ts` | 2 | `EsploraTx.fee`, `is_coinbase` |
-| `src/metrics.ts` | 2 | `feeTotalSats`/`feeAlkanesSats`/`feeOpReturnSats` no agregado |
-| `src/scan.ts` | 2 | atribuição de fee por tx |
-| `tools/seed-history.ts`, `tools/snapshot.ts` | 2 | propagar fee + `btcUsd` por dia |
-| `tools/price.ts` (novo) | 2 | fetch de preço BTC/USD (range + dia), injetável |
+Após a captura no scanner (2a) mergeada: rodar `backfill.yml` 1× (blocos 930000→955153) — popula fee +
+alvos no cache → `seed-history` reconstrói history.csv (com fees) + `contracts-daily.json`, preço pelo
+`price.ts` → publica. ~5h, automático.
 
 ## Tratamento de erro
 
-- **Preço indisponível** (CoinGecko fora/rate-limit): degrada — `btcUsd=0`/dia → gráfico USD pula o dia,
-  BTC continua. Nunca derruba o daily/backfill.
-- **`fee` ausente** (fonte sem o campo / coinbase): trata como 0.
-- Scan já é resiliente (commit 7e6c009: retry+backoff, pula bloco falho).
+- Preço indisponível (CoinGecko fora/limit) → `btcUsd=0` no dia → gráfico USD pula o dia; BTC segue.
+  Nunca derruba daily/backfill.
+- `fee` ausente / coinbase → 0. `nonDieselTarget` ausente → tx não entra no mapa.
+- Scanner já é resiliente (commit 7e6c009: retry/backoff, pula bloco falho).
 
-## Testes (TDD em tudo)
+## Testes (TDD nas funções puras)
 
-- `classify`/`scan`: atribuição de fee (Alkanes vs OP_RETURN vs total; coinbase = 0).
-- `metrics`: agregação dos novos campos de fee.
-- `history`: parse/escrita das colunas novas; retrocompat (CSV sem as colunas → 0);
-  `alkExDieselShareCount`; métricas de fee (extrapolação + subsídio + share).
-- `price`: parse da resposta CoinGecko com `fetchImpl` mockado (range e dia).
-- `report`/smoke: build não quebra com os novos campos.
+- `classify`: `nonDieselTarget` correto (Alkanes não-DIESEL com cellpack → "block:tx"; DIESEL → undefined).
+- `scan`/`metrics`: soma de fees por bucket (coinbase 0); mapa `nonDieselTargets` agregado.
+- `history`: colunas novas (parse/escrita/retrocompat); métricas de fee (extrapolação + subsídio + share).
+- `contracts` (`tools/contracts.ts`): upsert por data, `topTargets` ordena e soma all-time.
+- `price` (`tools/price.ts`): parse da resposta CoinGecko (range e dia) com `fetchImpl` mockado.
+- `report`/smoke: build não quebra com os novos campos/arquivo.
+- Todos os 31 testes atuais seguem verdes.
+
+## Plano de entrega (split)
+
+- **2a** = captura no scanner (fee + alvo) + `history.csv` fees + `contracts-daily.json` plumbing +
+  `price.ts` + pipelines + **re-scan** + **relatório de fees**. (A captura de alvos entra aqui pra o
+  re-scan ser único, mesmo o ranking sendo renderizado só na 2b.)
+- **2b** = **relatório de top contratos** (lê `contracts-daily.json`, sem novo scan) + mapa de rótulos.
 
 ## Fora de escopo (YAGNI)
 
-- Famílias de OP_RETURN (Ordinals/BRC-20/Stamps) — opção não escolhida agora.
-- Listar quais Alkanes além do DIESEL — não escolhida agora.
-- Preço intradiário/feerate em sats/vB — pode entrar depois se útil.
+- Split por tipo de ação (mint/deploy/transfer/swap) — não escolhido (swap não isola limpo).
+- Preço intradiário / feerate em sats/vB.
+- Buscar nomes de token on-chain — rótulos são um mapa estático ampliável.
