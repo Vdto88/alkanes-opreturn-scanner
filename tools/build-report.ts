@@ -72,6 +72,7 @@ const html = `<!doctype html>
   .card .l{font-size:13px;color:var(--muted)} .card .v{font-size:27px;font-weight:600;color:var(--head);margin-top:2px} .card .u{font-size:11px;color:var(--muted);margin-top:1px} .card .b{font-size:12px;color:var(--faint);margin-top:2px}
   .note{font-size:13px;color:var(--muted);margin:.25rem 0 0} .note b{color:var(--head);font-weight:600}
   .legend{display:flex;flex-wrap:wrap;gap:16px;margin:8px 0 10px;font-size:12px;color:var(--muted);align-items:center}
+  .legend span[data-ds]{cursor:pointer;user-select:none} .legend span.off{opacity:.4;text-decoration:line-through}
   .sw{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:middle}
   .wrap{position:relative;width:100%;height:300px;margin-bottom:1.5rem}
   .how{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.1rem 1.25rem;margin-top:.5rem}
@@ -92,12 +93,8 @@ const html = `<!doctype html>
 <p class="note">Of all Alkanes activity, <b>${dieselOfAlkanes}%</b> is DIESEL minting (cellpack <code>2:0</code> op&nbsp;77) — roughly <b>${estDieselPerDay.toLocaleString('en-US')}</b> mints/day estimated over the last 30 days.</p>
 
 <h2>Daily Alkanes share</h2>
-<div class="legend"><span><span class="sw" style="background:var(--teal)"></span>OP_RETURN bytes</span><span><span class="sw" style="background:var(--purple)"></span>Transactions</span><span><span class="sw" style="background:var(--faint)"></span>OP_RETURN penetration</span><span><span class="sw" style="background:var(--amber)"></span>Runes (bytes)</span><span><span class="sw" style="background:#4bb8d9"></span>Alkanes excl. DIESEL (tx)</span></div>
-<div class="legend" style="margin-bottom:6px">
-  <label><input type="checkbox" id="tgPen" checked> OP_RETURN penetration</label>
-  <label><input type="checkbox" id="tgRunes" checked> Runes</label>
-  <label><input type="checkbox" id="tgAlkEx" checked> Alkanes excl. DIESEL</label>
-</div>
+<div class="legend"><span data-ds="0"><span class="sw" style="background:var(--teal)"></span>OP_RETURN bytes</span><span data-ds="1"><span class="sw" style="background:var(--purple)"></span>Transactions</span><span data-ds="2"><span class="sw" style="background:var(--faint)"></span>OP_RETURN penetration</span><span data-ds="3"><span class="sw" style="background:var(--amber)"></span>Runes (bytes)</span><span data-ds="4"><span class="sw" style="background:#4bb8d9"></span>Alkanes excl. DIESEL (tx)</span></div>
+<p class="sub" style="margin:0 0 8px;font-size:12px">Tip: click a legend item to show/hide its line.</p>
 <div class="wrap"><canvas id="g"></canvas></div>
 
 <h2>DIESEL mints — share of all Bitcoin transactions</h2>
@@ -128,7 +125,7 @@ const gChart=new Chart(g,{type:'line',data:{labels:D.labels,datasets:[
  {label:'Runes (bytes)',data:D.runesDaily,borderColor:'#E9A23B',fill:false,pointRadius:1.5,tension:.25,borderWidth:2},
  {label:'Alkanes excl. DIESEL (tx)',data:D.alkExDieselDaily,borderColor:'#4bb8d9',borderDash:[4,3],fill:false,pointRadius:1.5,tension:.25,borderWidth:2}]},
  options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y+'%'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
-[['tgPen',2],['tgRunes',3],['tgAlkEx',4]].forEach(([id,idx])=>{const el=document.getElementById(id);el.addEventListener('change',()=>{gChart.setDatasetVisibility(idx,el.checked);gChart.update();});});
+document.querySelectorAll('.legend span[data-ds]').forEach(el=>{el.addEventListener('click',()=>{const i=+el.dataset.ds;const vis=gChart.isDatasetVisible(i);gChart.setDatasetVisibility(i,!vis);el.classList.toggle('off',vis);gChart.update();});});
 new Chart(m,{type:'line',data:{labels:D.labels,datasets:[
  {label:'DIESEL mints',data:D.dieselDaily,borderColor:'#E9A23B',backgroundColor:'rgba(233,162,59,0.12)',fill:true,pointRadius:1.5,tension:.25,borderWidth:2}]},
  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'% of all tx'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
