@@ -6,6 +6,9 @@ export interface ScanAggregate {
   runestoneBytesTotal: number;
   alkanesBytesTotal: number;
   dieselMints: number;
+  feeTotalSats: number;     // soma das fees de todas as tx (coinbase = 0)
+  feeAlkanesSats: number;   // fees das tx Alkanes
+  feeOpReturnSats: number;  // fees das tx com OP_RETURN
 }
 
 export interface Metrics {
@@ -16,7 +19,7 @@ export interface Metrics {
 }
 
 export function emptyAggregate(): ScanAggregate {
-  return { totalTx: 0, txWithOpReturn: 0, txAlkanes: 0, opReturnBytesTotal: 0, runestoneBytesTotal: 0, alkanesBytesTotal: 0, dieselMints: 0 };
+  return { totalTx: 0, txWithOpReturn: 0, txAlkanes: 0, opReturnBytesTotal: 0, runestoneBytesTotal: 0, alkanesBytesTotal: 0, dieselMints: 0, feeTotalSats: 0, feeAlkanesSats: 0, feeOpReturnSats: 0 };
 }
 
 const ratio = (num: number, den: number): number => (den === 0 ? 0 : num / den);

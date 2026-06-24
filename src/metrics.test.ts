@@ -11,6 +11,9 @@ describe('computeMetrics', () => {
       runestoneBytesTotal: 9500,
       alkanesBytesTotal: 9100,
       dieselMints: 70,
+      feeTotalSats: 0,
+      feeAlkanesSats: 0,
+      feeOpReturnSats: 0,
     };
     const m = computeMetrics(a);
     expect(m.opReturnShareByCount).toBeCloseTo(0.2);       // 200/1000
@@ -25,5 +28,12 @@ describe('computeMetrics', () => {
     expect(m.alkanesOfOpReturnByCount).toBe(0);
     expect(m.alkanesOfOpReturnByBytes).toBe(0);
     expect(m.alkanesShareByCount).toBe(0);
+  });
+
+  it('emptyAggregate zera os campos de fee', () => {
+    const a = emptyAggregate();
+    expect(a.feeTotalSats).toBe(0);
+    expect(a.feeAlkanesSats).toBe(0);
+    expect(a.feeOpReturnSats).toBe(0);
   });
 });
