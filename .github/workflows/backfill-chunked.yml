@@ -1,16 +1,40 @@
-name: daily snapshot
+name: dense backfill (chunked, sequential)
+
+# Densifica uma janela grande em CHUNKS sequenciais (matrix max-parallel:1), pra
+# cada job caber no limite de ~6h do runner. Cada chunk faz scan denso do seu range,
+# faz merge no history.csv (upsert por dia, preserva os outros dias) e publica.
+# Um único dispatch roda todos os chunks encadeados, sozinho, na nuvem.
+# Janela atual = últimos ~60 dias (Abr 26 → Jun 25), sample=1 (todos os blocos).
 
 on:
-  schedule:
-    - cron: '17 6 * * *'   # 06:17 UTC, todo dia
-  workflow_dispatch: {}     # permite rodar manualmente
+  workflow_dispatch:
+    inputs:
+      sample:
+        description: "Escanear 1 a cada N blocos (1 = todos)"
+        default: "1"
+      concurrency:
+        description: "Páginas em paralelo por bloco"
+        default: "20"
 
 permissions:
-  contents: write           # pra commitar history.csv + report.html de volta
+  contents: write
 
 jobs:
-  snapshot:
+  backfill:
     runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        chunk:
+          - { from: 946600, to: 947839 }
+          - { from: 947840, to: 949079 }
+          - { from: 949080, to: 950319 }
+          - { from: 950320, to: 951559 }
+          - { from: 951560, to: 952799 }
+          - { from: 952800, to: 954039 }
+          - { from: 954040, to: 955270 }
     steps:
       - name: Checkout scanner
         uses: actions/checkout@v4
@@ -26,13 +50,13 @@ jobs:
       - name: Install deps
         run: npm install --no-audit --no-fund
 
-      - name: Tests
-        run: npm test
-
-      - name: Daily snapshot
+      - name: Dense scan (chunk ${{ matrix.chunk.from }}-${{ matrix.chunk.to }})
         env:
           SUBFROST_KEY: ${{ secrets.SUBFROST_KEY }}
-        run: npx tsx tools/snapshot.ts --blocks 144 --sample 1 --concurrency 16
+        run: npx tsx src/cli.ts --from ${{ matrix.chunk.from }} --to ${{ matrix.chunk.to }} --sample ${{ inputs.sample }} --concurrency ${{ inputs.concurrency }}
+
+      - name: Rebuild history.csv from cache (merge)
+        run: npx tsx tools/seed-history.ts cache history.csv --merge
 
       - name: Build report
         run: npx tsx tools/build-report.ts
@@ -66,6 +90,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add history.csv report.html contracts-daily.json
-          git diff --cached --quiet || git commit -m "chore: daily snapshot $(date -u +%Y-%m-%d)"
+          git diff --cached --quiet || git commit -m "chore: dense backfill chunk ${{ matrix.chunk.from }}-${{ matrix.chunk.to }}"
           git pull --rebase --autostash origin master || true
           git push
