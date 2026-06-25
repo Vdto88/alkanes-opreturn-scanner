@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import {
   readHistory, rollup, alkShareCount, alkBytesShare, opReturnShare, dieselShareCount, runesBytesShare, otherBytesShare,
-  alkExDieselShareCount,
+  alkExDieselShareCount, minerRevenueUsdDay, feeAlkanesShare, feeOpReturnShare,
   utcDate, type HistoryRow, type Sums,
 } from './history';
 
@@ -21,6 +21,12 @@ if (rows.length === 0) {
 const r1 = (x: number) => +(x * 100).toFixed(1);
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const mday = (iso: string) => { const [, m, d] = iso.split('-'); return `${MONTHS[+m - 1]} ${+d}`; };
+
+// Receita do minerador no dia em BTC (fees extrapoladas amostra→144 blocos + subsídio 3,125 BTC).
+// É o minerRevenueUsdDay sem o ×btcUsd — o tooltip do gráfico mostra esse BTC ao lado do USD.
+const SUBSIDY_SATS = 312_500_000; // 3,125 BTC/bloco (heights 930000–955153)
+const feeBtcDay = (r: HistoryRow): number =>
+  r.blocksScanned ? (r.feeTotalSats / r.blocksScanned * 144 + 144 * SUBSIDY_SATS) / 1e8 : 0;
 
 const sumsOfRow = (r: HistoryRow): Sums => ({
   blocksScanned: r.blocksScanned, totalTx: r.totalTx, txWithOpReturn: r.txWithOpReturn,
@@ -53,6 +59,8 @@ const data = {
   opReturnDaily: rows.map((r) => r1(opReturnShare(sumsOfRow(r)))),
   runesDaily: rows.map((r) => r1(runesBytesShare(sumsOfRow(r)))),
   alkExDieselDaily: rows.map((r) => r1(alkExDieselShareCount(sumsOfRow(r)))),
+  feeUsdDaily: rows.map((r) => Math.round(minerRevenueUsdDay(r))),
+  feeBtcDaily: rows.map((r) => +feeBtcDay(r).toFixed(2)),
   donut: [donutAlk, donutRunes, donutOther],
   span: `${mday(rows[0].date)} – ${mday(rows[rows.length - 1].date)}`,
   days: rows.length,
@@ -88,6 +96,7 @@ const html = `<!doctype html>
   ${card('Last 30 days', d30)}
   ${card('All time', all)}
   <div class="card"><div class="l">OP_RETURN penetration</div><div class="v">${r1(opReturnShare(all))}%</div><div class="u">of all BTC tx (carry OP_RETURN)</div><div class="b">${r1(opReturnShare(d30))}% last 30 days</div></div>
+  <div class="card"><div class="l">Alkanes share of fees</div><div class="v">${r1(feeAlkanesShare(all))}%</div><div class="u">of miner fee revenue (all time)</div><div class="b">${r1(feeAlkanesShare(d30))}% last 30 days · OP_RETURN ${r1(feeOpReturnShare(all))}%</div></div>
 </div>
 <p class="note">Numbers you may see elsewhere can differ — they depend on the time window and whether they measure transactions vs bytes vs outputs (and whether the coinbase is included).</p>
 <p class="note">Of all Alkanes activity, <b>${dieselOfAlkanes}%</b> is DIESEL minting (cellpack <code>2:0</code> op&nbsp;77) — roughly <b>${estDieselPerDay.toLocaleString('en-US')}</b> mints/day estimated over the last 30 days.</p>
@@ -104,6 +113,12 @@ const html = `<!doctype html>
 <h2>OP_RETURN bytes (all time)</h2>
 <div class="legend"><span><span class="sw" style="background:var(--teal)"></span>Alkanes ${donutAlk}%</span><span><span class="sw" style="background:var(--amber)"></span>Runes ${donutRunes}%</span><span><span class="sw" style="background:#4a4a52"></span>Other ${donutOther}%</span></div>
 <div class="wrap" style="height:230px;max-width:360px"><canvas id="d"></canvas></div>
+
+<h2>Miner fee revenue</h2>
+<div class="legend"><span><span class="sw" style="background:var(--amber)"></span>Total miner revenue — fees + subsidy (USD/day)</span></div>
+<p class="note">Alkanes transactions paid <b>${r1(feeAlkanesShare(all))}%</b> of all miner fee revenue over the period (<b>${r1(feeAlkanesShare(d30))}%</b> last 30 days); every OP_RETURN-carrying tx together paid <b>${r1(feeOpReturnShare(all))}%</b>. By <i>fee revenue</i> Alkanes are a far smaller slice than by transaction count — most Alkanes tx are tiny DIESEL mints.</p>
+<div class="wrap"><canvas id="f"></canvas></div>
+<p class="note">Daily revenue extrapolates the sampled blocks to a full day (×144 ÷ blocks sampled) and adds the <b>3.125 BTC</b>/block subsidy, converted to USD at that day's BTC price. Tooltip shows the BTC figure; days before the price source's range show $0 (BTC still valid).</p>
 
 <h2>How it's calculated</h2>
 <div class="how">
@@ -130,6 +145,7 @@ new Chart(m,{type:'line',data:{labels:D.labels,datasets:[
  {label:'DIESEL mints',data:D.dieselDaily,borderColor:'#E9A23B',backgroundColor:'rgba(233,162,59,0.12)',fill:true,pointRadius:1.5,tension:.25,borderWidth:2}]},
  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'% of all tx'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
 new Chart(d,{type:'doughnut',data:{labels:['Alkanes','Runes','Other'],datasets:[{data:D.donut,backgroundColor:['#2DBE8E','#E9A23B','#4a4a52'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.parsed+'%'}}}}});
+new Chart(f,{type:'line',data:{labels:D.labels,datasets:[{label:'Miner fee revenue (USD/day)',data:D.feeUsdDaily,borderColor:'#E9A23B',fill:true,backgroundColor:'rgba(233,162,59,0.12)',pointRadius:1,tension:.25,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'$'+c.parsed.y.toLocaleString('en-US')+' ('+D.feeBtcDaily[c.dataIndex]+' BTC)'}}},scales:{y:{grid:{color:grid},ticks:{callback:v=>'$'+(v/1e6).toFixed(1)+'M'}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:10}}}}});
 </script></body></html>`;
 
 writeFileSync('report.html', html);
