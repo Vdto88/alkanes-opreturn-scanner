@@ -99,6 +99,14 @@ export const opReturnShare = (s: Sums): number => (s.totalTx ? s.txWithOpReturn 
 export const dieselShareCount = (s: Sums): number => (s.totalTx ? s.dieselMints / s.totalTx : 0);
 // Alkanes que NÃO são mint de DIESEL (a diversidade real do protocolo), como % de todas as tx
 export const alkExDieselShareCount = (s: Sums): number => (s.totalTx ? Math.max(0, s.txAlkanes - s.dieselMints) / s.totalTx : 0);
+// Alkanes DENTRO do universo OP_RETURN: das tx que carregam OP_RETURN, quantas são Alkanes
+export const alkOfOpReturnShare = (s: Sums): number => (s.txWithOpReturn ? s.txAlkanes / s.txWithOpReturn : 0);
+// Bytes médios de OP_RETURN por tx em cada balde (eficiência): Alkanes vs o resto do OP_RETURN
+export const bytesPerAlkanesTx = (s: Sums): number => (s.txAlkanes ? s.alkanesBytes / s.txAlkanes : 0);
+export const bytesPerOtherOpReturnTx = (s: Sums): number => {
+  const otherTx = s.txWithOpReturn - s.txAlkanes;
+  return otherTx > 0 ? Math.max(0, s.opReturnBytes - s.alkanesBytes) / otherTx : 0;
+};
 // Decomposição dos bytes de OP_RETURN: Alkanes + Runes + Other = 100%
 export const runesBytesShare = (s: Sums): number => (s.opReturnBytes ? Math.max(0, s.runestoneBytes - s.alkanesBytes) / s.opReturnBytes : 0);
 export const otherBytesShare = (s: Sums): number => (s.opReturnBytes ? Math.max(0, s.opReturnBytes - s.runestoneBytes) / s.opReturnBytes : 0);

@@ -1,7 +1,8 @@
 import { writeFileSync } from 'node:fs';
 import {
   readHistory, rollup, alkShareCount, alkBytesShare, opReturnShare, dieselShareCount, runesBytesShare, otherBytesShare,
-  alkExDieselShareCount, minerRevenueUsdDay, feeAlkanesShare, feeOpReturnShare,
+  alkExDieselShareCount, alkOfOpReturnShare, bytesPerAlkanesTx, bytesPerOtherOpReturnTx,
+  minerRevenueUsdDay, feeAlkanesShare, feeOpReturnShare,
   utcDate, type HistoryRow, type Sums,
 } from './history';
 
@@ -31,6 +32,7 @@ const feeBtcDay = (r: HistoryRow): number =>
 const sumsOfRow = (r: HistoryRow): Sums => ({
   blocksScanned: r.blocksScanned, totalTx: r.totalTx, txWithOpReturn: r.txWithOpReturn,
   txAlkanes: r.txAlkanes, opReturnBytes: r.opReturnBytes, runestoneBytes: r.runestoneBytes, alkanesBytes: r.alkanesBytes, dieselMints: r.dieselMints,
+  feeTotalSats: r.feeTotalSats, feeAlkanesSats: r.feeAlkanesSats, feeOpReturnSats: r.feeOpReturnSats,
 });
 
 const all = rollup(rows, '0000-00-00');
@@ -59,8 +61,12 @@ const data = {
   opReturnDaily: rows.map((r) => r1(opReturnShare(sumsOfRow(r)))),
   runesDaily: rows.map((r) => r1(runesBytesShare(sumsOfRow(r)))),
   alkExDieselDaily: rows.map((r) => r1(alkExDieselShareCount(sumsOfRow(r)))),
+  alkOfOpReturnDaily: rows.map((r) => r1(alkOfOpReturnShare(sumsOfRow(r)))),
+  feeAlkanesDaily: rows.map((r) => r1(feeAlkanesShare(sumsOfRow(r)))),
   feeUsdDaily: rows.map((r) => Math.round(minerRevenueUsdDay(r))),
   feeBtcDaily: rows.map((r) => +feeBtcDay(r).toFixed(2)),
+  bytesAlkDaily: rows.map((r) => +bytesPerAlkanesTx(sumsOfRow(r)).toFixed(1)),
+  bytesOtherDaily: rows.map((r) => +bytesPerOtherOpReturnTx(sumsOfRow(r)).toFixed(1)),
   donut: [donutAlk, donutRunes, donutOther],
   span: `${mday(rows[0].date)} – ${mday(rows[rows.length - 1].date)}`,
   days: rows.length,
@@ -106,6 +112,11 @@ const html = `<!doctype html>
 <p class="sub" style="margin:0 0 8px;font-size:12px">Tip: click a legend item to show/hide its line.</p>
 <div class="wrap"><canvas id="g"></canvas></div>
 
+<h2>Alkanes' share of OP_RETURN</h2>
+<div class="legend"><span><span class="sw" style="background:var(--teal)"></span>% of OP_RETURN transactions</span><span><span class="sw" style="background:var(--purple)"></span>% of OP_RETURN bytes</span></div>
+<p class="note">Of every Bitcoin transaction that carries an OP_RETURN, <b>${r1(alkOfOpReturnShare(d30))}%</b> are Alkanes (last 30 days), and they account for <b>${r1(alkBytesShare(d30))}%</b> of all OP_RETURN data bytes. This is Alkanes' grip on OP_RETURN itself — independent of how many BTC tx use OP_RETURN at all.</p>
+<div class="wrap"><canvas id="o"></canvas></div>
+
 <h2>DIESEL mints — share of all Bitcoin transactions</h2>
 <div class="legend"><span><span class="sw" style="background:var(--amber)"></span>DIESEL mints (% of all tx)</span></div>
 <div class="wrap" style="height:240px"><canvas id="m"></canvas></div>
@@ -114,18 +125,28 @@ const html = `<!doctype html>
 <div class="legend"><span><span class="sw" style="background:var(--teal)"></span>Alkanes ${donutAlk}%</span><span><span class="sw" style="background:var(--amber)"></span>Runes ${donutRunes}%</span><span><span class="sw" style="background:#4a4a52"></span>Other ${donutOther}%</span></div>
 <div class="wrap" style="height:230px;max-width:360px"><canvas id="d"></canvas></div>
 
+<h2>OP_RETURN bytes per transaction</h2>
+<div class="legend"><span><span class="sw" style="background:var(--teal)"></span>Alkanes</span><span><span class="sw" style="background:var(--amber)"></span>Other OP_RETURN (non-Alkanes)</span></div>
+<p class="note">Alkanes' OP_RETURN payload is small and <b>stable</b> (~${bytesPerAlkanesTx(d30).toFixed(1)} bytes/tx), while the rest of OP_RETURN traffic is larger and more volatile — Alkanes are byte-efficient on-chain. (Bytes = full OP_RETURN output script.)</p>
+<div class="wrap" style="height:240px"><canvas id="eff"></canvas></div>
+
 <h2>Miner fee revenue</h2>
 <div class="legend"><span><span class="sw" style="background:var(--amber)"></span>Total miner revenue — fees + subsidy (USD/day)</span></div>
 <p class="note">Alkanes transactions paid <b>${r1(feeAlkanesShare(all))}%</b> of all miner fee revenue over the period (<b>${r1(feeAlkanesShare(d30))}%</b> last 30 days); every OP_RETURN-carrying tx together paid <b>${r1(feeOpReturnShare(all))}%</b>. By <i>fee revenue</i> Alkanes are a far smaller slice than by transaction count — most Alkanes tx are tiny DIESEL mints.</p>
 <div class="wrap"><canvas id="f"></canvas></div>
 <p class="note">Daily revenue extrapolates the sampled blocks to a full day (×144 ÷ blocks sampled) and adds the <b>3.125 BTC</b>/block subsidy, converted to USD at that day's BTC price. Tooltip shows the BTC figure; days before the price source's range show $0 (BTC still valid).</p>
 
+<h2>Alkanes' share of miner fee revenue</h2>
+<div class="legend"><span><span class="sw" style="background:var(--teal)"></span>Alkanes — % of daily fee revenue</span></div>
+<p class="note">By <i>fee revenue</i> — what miners actually earn from fees — Alkanes are <b>${r1(feeAlkanesShare(d30))}%</b> over the last 30 days, far below their share of transaction <i>count</i>, because most Alkanes tx are tiny DIESEL mints that pay little. (Subsidy excluded here; fees only.)</p>
+<div class="wrap" style="height:240px"><canvas id="fa"></canvas></div>
+
 <h2>How it's calculated</h2>
 <div class="how">
   <p>We read every Bitcoin block in the window and inspect each transaction's outputs. An output whose script starts with <code>6a</code> is an <b>OP_RETURN</b>; one starting <code>6a5d</code> is a Runestone.</p>
   <p>We decode the Runestone and if any protostone carries <b>protocol_tag = 1</b>, the transaction is <b>Alkanes</b>. A <b>DIESEL mint</b> is the specific case where the cellpack targets <code>2:0</code> with opcode <code>77</code> (the genesis alkane) — today that's the vast majority of all Alkanes activity.</p>
   <p><b>Share of transactions</b> = matching tx ÷ all tx. <b>Share of OP_RETURN bytes</b> = Alkanes OP_RETURN bytes ÷ all OP_RETURN bytes. Shares are unaffected by sampling; each day rests on ~24-48 sampled blocks (see <code>blocksScanned</code> in the CSV). Classification reuses the open-source <a href="https://github.com/Vdto88/alkanes-opreturn-decoder">alkanes-opreturn-decoder</a>.</p>
-  <p><b>Glossary.</b> <b>OP_RETURN penetration</b>: share of all BTC tx that carry an OP_RETURN. <b>Alkanes (tx)</b>: share of all BTC tx that are Alkanes. <b>Alkanes (bytes)</b>: share of OP_RETURN bytes that are Alkanes. <b>Runes</b>: OP_RETURN bytes that are Runestones but not Alkanes. <b>Alkanes excl. DIESEL</b>: Alkanes tx that aren't DIESEL mints — "real app" usage. <b>DIESEL</b>: mint of the genesis alkane (cellpack <code>2:0</code> op&nbsp;77).</p>
+  <p><b>Glossary.</b> <b>OP_RETURN penetration</b>: share of all BTC tx that carry an OP_RETURN. <b>Alkanes (tx)</b>: share of all BTC tx that are Alkanes. <b>Alkanes (bytes)</b>: share of OP_RETURN bytes that are Alkanes. <b>Runes</b>: OP_RETURN bytes that are Runestones but not Alkanes. <b>Alkanes excl. DIESEL</b>: Alkanes tx that aren't DIESEL mints — "real app" usage. <b>DIESEL</b>: mint of the genesis alkane (cellpack <code>2:0</code> op&nbsp;77). <b>Alkanes of OP_RETURN</b>: of tx that carry an OP_RETURN, the share that are Alkanes (by tx and by bytes). <b>Bytes per tx</b>: average OP_RETURN script size per transaction in each bucket. <b>Alkanes share of fee revenue</b>: Alkanes fees ÷ total fees (subsidy excluded).</p>
 </div>
 <footer>Source data: <a href="./history.csv">history.csv</a> (one row per day). Bytes = full output script; coinbase included. Auto-updated daily from the alkanes-opreturn-scanner.</footer>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -146,6 +167,17 @@ new Chart(m,{type:'line',data:{labels:D.labels,datasets:[
  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'% of all tx'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
 new Chart(d,{type:'doughnut',data:{labels:['Alkanes','Runes','Other'],datasets:[{data:D.donut,backgroundColor:['#2DBE8E','#E9A23B','#4a4a52'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.parsed+'%'}}}}});
 new Chart(f,{type:'line',data:{labels:D.labels,datasets:[{label:'Miner fee revenue (USD/day)',data:D.feeUsdDaily,borderColor:'#E9A23B',fill:true,backgroundColor:'rgba(233,162,59,0.12)',pointRadius:1,tension:.25,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'$'+c.parsed.y.toLocaleString('en-US')+' ('+D.feeBtcDaily[c.dataIndex]+' BTC)'}}},scales:{y:{grid:{color:grid},ticks:{callback:v=>'$'+(v/1e6).toFixed(1)+'M'}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:10}}}}});
+new Chart(o,{type:'line',data:{labels:D.labels,datasets:[
+ {label:'% of OP_RETURN transactions',data:D.alkOfOpReturnDaily,borderColor:'#2DBE8E',fill:false,pointRadius:1.5,tension:.25,borderWidth:2.5},
+ {label:'% of OP_RETURN bytes',data:D.bytesDaily,borderColor:'#9d94e8',fill:false,pointRadius:1.5,tension:.25,borderWidth:2}]},
+ options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y+'%'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
+new Chart(eff,{type:'line',data:{labels:D.labels,datasets:[
+ {label:'Alkanes',data:D.bytesAlkDaily,borderColor:'#2DBE8E',fill:false,pointRadius:1,tension:.25,borderWidth:2},
+ {label:'Other OP_RETURN',data:D.bytesOtherDaily,borderColor:'#E9A23B',fill:false,pointRadius:1,tension:.25,borderWidth:2}]},
+ options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y+' B'}}},scales:{y:{min:0,grid:{color:grid},ticks:{callback:v=>v+' B'}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
+new Chart(fa,{type:'line',data:{labels:D.labels,datasets:[
+ {label:'Alkanes share of fees',data:D.feeAlkanesDaily,borderColor:'#2DBE8E',backgroundColor:'rgba(45,190,142,0.12)',fill:true,pointRadius:1,tension:.25,borderWidth:2}]},
+ options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'% of fee revenue'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
 </script></body></html>`;
 
 writeFileSync('report.html', html);

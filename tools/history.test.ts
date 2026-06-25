@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readHistory, writeHistory, upsert, rollup, alkShareCount, alkBytesShare, alkExDieselShareCount, feeAlkanesShare, feeOpReturnShare, minerRevenueUsdDay, type HistoryRow } from './history';
+import { readHistory, writeHistory, upsert, rollup, alkShareCount, alkBytesShare, alkExDieselShareCount, alkOfOpReturnShare, bytesPerAlkanesTx, bytesPerOtherOpReturnTx, feeAlkanesShare, feeOpReturnShare, minerRevenueUsdDay, type HistoryRow, type Sums } from './history';
 
 const mk = (date: string, txAlkanes: number, totalTx = 100, alkanesBytes = 90, opReturnBytes = 100): HistoryRow => ({
   date, fromHeight: 1, toHeight: 2, blocksScanned: 1, totalTx, txWithOpReturn: 50, txAlkanes, opReturnBytes, runestoneBytes: alkanesBytes, alkanesBytes, dieselMints: txAlkanes, feeTotalSats: 0, feeAlkanesSats: 0, feeOpReturnSats: 0, btcUsd: 0,
@@ -46,6 +46,30 @@ describe('history csv', () => {
       feeTotalSats: 0, feeAlkanesSats: 0, feeOpReturnSats: 0, btcUsd: 0,
     };
     expect(alkExDieselShareCount(s)).toBeCloseTo(0.15); // (80 − 50) / 200
+  });
+
+  it('alkOfOpReturnShare = txAlkanes / txWithOpReturn (Alkanes dentro do OP_RETURN)', () => {
+    const s: Sums = {
+      blocksScanned: 1, totalTx: 100, txWithOpReturn: 20, txAlkanes: 10,
+      opReturnBytes: 500, runestoneBytes: 300, alkanesBytes: 210, dieselMints: 8,
+      feeTotalSats: 0, feeAlkanesSats: 0, feeOpReturnSats: 0, btcUsd: 0,
+    };
+    expect(alkOfOpReturnShare(s)).toBeCloseTo(0.5); // 10 / 20
+    // sem nenhum OP_RETURN → 0 (não NaN)
+    expect(alkOfOpReturnShare({ ...s, txWithOpReturn: 0 })).toBe(0);
+  });
+
+  it('bytesPerAlkanesTx / bytesPerOtherOpReturnTx = bytes médios de OP_RETURN por tx em cada balde', () => {
+    const s: Sums = {
+      blocksScanned: 1, totalTx: 100, txWithOpReturn: 20, txAlkanes: 10,
+      opReturnBytes: 500, runestoneBytes: 300, alkanesBytes: 210, dieselMints: 8,
+      feeTotalSats: 0, feeAlkanesSats: 0, feeOpReturnSats: 0, btcUsd: 0,
+    };
+    expect(bytesPerAlkanesTx(s)).toBeCloseTo(21);          // 210 / 10
+    expect(bytesPerOtherOpReturnTx(s)).toBeCloseTo(29);    // (500 − 210) / (20 − 10)
+    // sem tx em cada balde → 0 (não NaN/Infinity)
+    expect(bytesPerAlkanesTx({ ...s, txAlkanes: 0 })).toBe(0);
+    expect(bytesPerOtherOpReturnTx({ ...s, txWithOpReturn: 10, txAlkanes: 10 })).toBe(0);
   });
 
   it('feeAlkanesShare / feeOpReturnShare = fee do bucket / fee total', () => {
