@@ -32,7 +32,7 @@ jobs:
       - name: Daily snapshot
         env:
           SUBFROST_KEY: ${{ secrets.SUBFROST_KEY }}
-        run: npx tsx tools/snapshot.ts --blocks 144 --sample 1 --concurrency 16
+        run: npx tsx tools/snapshot.ts --blocks 144 --sample 6 --concurrency 16
 
       - name: Build report
         run: npx tsx tools/build-report.ts
