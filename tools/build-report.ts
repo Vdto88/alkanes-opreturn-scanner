@@ -36,7 +36,8 @@ const sumsOfRow = (r: HistoryRow): Sums => ({
 });
 
 const all = rollup(rows, '0000-00-00');
-const latest = sumsOfRow(rows[rows.length - 1]);
+const lastRow = rows[rows.length - 1];
+const latest = sumsOfRow(lastRow);
 const d7 = rollup(rows, utcDate(-6));
 const d30 = rollup(rows, utcDate(-29));
 
@@ -68,6 +69,7 @@ const data = {
   bytesAlkDaily: rows.map((r) => +bytesPerAlkanesTx(sumsOfRow(r)).toFixed(1)),
   bytesOtherDaily: rows.map((r) => +bytesPerOtherOpReturnTx(sumsOfRow(r)).toFixed(1)),
   donut: [donutAlk, donutRunes, donutOther],
+  opReturnPie: [lastRow.txAlkanes, Math.max(0, lastRow.txWithOpReturn - lastRow.txAlkanes)],
   span: `${mday(rows[0].date)} – ${mday(rows[rows.length - 1].date)}`,
   days: rows.length,
   totalTx: all.totalTx,
@@ -116,6 +118,11 @@ const html = `<!doctype html>
 <div class="legend"><span><span class="sw" style="background:var(--teal)"></span>% of OP_RETURN transactions</span><span><span class="sw" style="background:var(--purple)"></span>% of OP_RETURN bytes</span></div>
 <p class="note">Of every Bitcoin transaction that carries an OP_RETURN, <b>${r1(alkOfOpReturnShare(d30))}%</b> are Alkanes (last 30 days), and they account for <b>${r1(alkBytesShare(d30))}%</b> of all OP_RETURN data bytes. This is Alkanes' grip on OP_RETURN itself — independent of how many BTC tx use OP_RETURN at all.</p>
 <div class="wrap"><canvas id="o"></canvas></div>
+
+<h2>Last day — share of OP_RETURN transactions</h2>
+<div class="legend"><span><span class="sw" style="background:var(--teal)"></span>Alkanes ${r1(alkOfOpReturnShare(latest))}%</span><span><span class="sw" style="background:#4a4a52"></span>Other OP_RETURN ${r1(1 - alkOfOpReturnShare(latest))}%</span></div>
+<div class="wrap" style="height:250px;max-width:380px"><canvas id="op"></canvas></div>
+<p class="note"><b>How this is calculated.</b> Last day = ${mday(lastRow.date)} (Bitcoin blocks ${lastRow.fromHeight.toLocaleString('en-US')}–${lastRow.toHeight.toLocaleString('en-US')}, ${lastRow.blocksScanned} sampled). Of <b>${lastRow.txWithOpReturn.toLocaleString('en-US')}</b> transactions carrying an OP_RETURN that day, <b>${lastRow.txAlkanes.toLocaleString('en-US')}</b> were Alkanes &rarr; <b>${r1(alkOfOpReturnShare(latest))}%</b>. Share = Alkanes OP_RETURN tx &divide; all OP_RETURN tx. A transaction counts as Alkanes when one of its OP_RETURN outputs decodes as a Runestone whose protostone carries <code>protocol_tag = 1</code> (via the open-source <a href="https://github.com/Vdto88/alkanes-opreturn-decoder">alkanes-opreturn-decoder</a>).</p>
 
 <h2>DIESEL mints — share of all Bitcoin transactions</h2>
 <div class="legend"><span><span class="sw" style="background:var(--amber)"></span>DIESEL mints (% of all tx)</span></div>
@@ -166,6 +173,7 @@ new Chart(m,{type:'line',data:{labels:D.labels,datasets:[
  {label:'DIESEL mints',data:D.dieselDaily,borderColor:'#E9A23B',backgroundColor:'rgba(233,162,59,0.12)',fill:true,pointRadius:1.5,tension:.25,borderWidth:2}]},
  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'% of all tx'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
 new Chart(d,{type:'doughnut',data:{labels:['Alkanes','Runes','Other'],datasets:[{data:D.donut,backgroundColor:['#2DBE8E','#E9A23B','#4a4a52'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.parsed+'%'}}}}});
+new Chart(op,{type:'pie',data:{labels:['Alkanes','Other OP_RETURN'],datasets:[{data:D.opReturnPie,backgroundColor:['#2DBE8E','#4a4a52'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const t=c.dataset.data.reduce((a,b)=>a+b,0);return c.label+': '+c.parsed.toLocaleString('en-US')+' tx ('+(t?c.parsed/t*100:0).toFixed(1)+'%)';}}}}}});
 new Chart(f,{type:'line',data:{labels:D.labels,datasets:[{label:'Miner fee revenue (USD/day)',data:D.feeUsdDaily,borderColor:'#E9A23B',fill:true,backgroundColor:'rgba(233,162,59,0.12)',pointRadius:1,tension:.25,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'$'+c.parsed.y.toLocaleString('en-US')+' ('+D.feeBtcDaily[c.dataIndex]+' BTC)'}}},scales:{y:{grid:{color:grid},ticks:{callback:v=>'$'+(v/1e6).toFixed(1)+'M'}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:10}}}}});
 new Chart(o,{type:'line',data:{labels:D.labels,datasets:[
  {label:'% of OP_RETURN transactions',data:D.alkOfOpReturnDaily,borderColor:'#2DBE8E',fill:false,pointRadius:1.5,tension:.25,borderWidth:2.5},
