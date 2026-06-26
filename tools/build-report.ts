@@ -41,11 +41,7 @@ const sumsOfRow = (r: HistoryRow): Sums => ({
 const all = rollup(rows, '0000-00-00');
 const lastRow = rows[rows.length - 1];
 const latest = sumsOfRow(lastRow);
-const d7 = rollup(rows, utcDate(-6));
 const d30 = rollup(rows, utcDate(-29));
-
-const card = (label: string, s: Sums) =>
-  `<div class="card"><div class="l">${label}</div><div class="v">${r1(alkShareCount(s))}%</div><div class="u">Alkanes — of all BTC tx</div><div class="b">${r1(alkBytesShare(s))}% of OP_RETURN bytes</div></div>`;
 
 // DIESEL como % das tx Alkanes (mostra que Alkanes ≈ DIESEL) no período inteiro
 const dieselOfAlkanes = all.txAlkanes ? r1(all.dieselMints / all.txAlkanes) : 0;
@@ -107,14 +103,6 @@ const html = `<!doctype html>
 </style></head><body>
 <h1>Alkanes' share of Bitcoin OP_RETURN</h1>
 <p class="sub">${data.span} · ${data.days} days · ${data.totalTx.toLocaleString('en-US')} transactions sampled · updated daily</p>
-<div class="cards">
-  ${card('Latest day', latest)}
-  ${card('Last 7 days', d7)}
-  ${card('Last 30 days', d30)}
-  ${card('All time', all)}
-  <div class="card"><div class="l">OP_RETURN penetration</div><div class="v">${r1(opReturnShare(all))}%</div><div class="u">of all BTC tx (carry OP_RETURN)</div><div class="b">${r1(opReturnShare(d30))}% last 30 days</div></div>
-  <div class="card"><div class="l">Alkanes share of fees</div><div class="v">${r1(feeAlkanesShare(all))}%</div><div class="u">of miner fee revenue (all time)</div><div class="b">${r1(feeAlkanesShare(d30))}% last 30 days · OP_RETURN ${r1(feeOpReturnShare(all))}%</div></div>
-</div>
 <p class="note">Numbers you may see elsewhere can differ — they depend on the time window and whether they measure transactions vs bytes vs outputs (and whether the coinbase is included).</p>
 <p class="note">Of all Alkanes activity, <b>${dieselOfAlkanes}%</b> is DIESEL minting (cellpack <code>2:0</code> op&nbsp;77) — roughly <b>${estDieselPerDay.toLocaleString('en-US')}</b> mints/day estimated over the last 30 days.</p>
 
