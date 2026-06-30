@@ -1,4 +1,5 @@
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import {
   readHistory, rollup, alkShareCount, alkBytesShare, opReturnShare, dieselShareCount, runesBytesShare, otherBytesShare,
   alkExDieselShareCount, alkOfOpReturnShare, bytesPerAlkanesTx, bytesPerOtherOpReturnTx,
@@ -18,6 +19,18 @@ if (rows.length === 0) {
   console.error(`history vazio (${historyPath}) — rode tools/snapshot.ts ou tools/seed-history.ts primeiro`);
   process.exit(1);
 }
+
+// Arquivo LATERAL (weight + UNCOMMON•GOODS por dia), gerado pelo indexer (tools/export-blockspace.ts
+// no repo opreturn-indexer). Fica FORA do history.csv de 15 colunas — decisão de schema p/ não
+// arriscar o CSV. Se ausente, os 2 gráficos novos simplesmente não renderizam (build não quebra).
+interface BlockspaceDay {
+  date: string; weightTotal: number; weightAlkanes: number;
+  ugMints: number; dieselUg: number; dieselMints: number; blocksScanned: number;
+}
+const bsPath = join(dirname(historyPath) || '.', 'blockspace-daily.json');
+const bsDays: BlockspaceDay[] = existsSync(bsPath) ? JSON.parse(readFileSync(bsPath, 'utf8')) : [];
+const bsMap = new Map(bsDays.map((d) => [d.date, d]));
+const hasBs = bsDays.length > 0;
 
 const r1 = (x: number) => +(x * 100).toFixed(1);
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -53,6 +66,28 @@ const donutAlk = r1(alkBytesShare(all));
 const donutRunes = r1(runesBytesShare(all));
 const donutOther = r1(otherBytesShare(all));
 
+// --- Métricas do arquivo lateral (indexer): blockspace literal (weight) + DIESEL∩UG ---
+// Alinhadas às MESMAS datas de `rows` (lookup por data); dia sem dado lateral vira null (gap no gráfico).
+const blockspaceDaily = rows.map((r) => {
+  const b = bsMap.get(r.date);
+  return b && b.weightTotal ? r1(b.weightAlkanes / b.weightTotal) : null;
+});
+const dieselUgDaily = rows.map((r) => {
+  const b = bsMap.get(r.date);
+  return b && b.ugMints ? r1(b.dieselUg / b.ugMints) : null;
+});
+const sumW = bsDays.reduce((a, d) => a + d.weightTotal, 0);
+const sumWA = bsDays.reduce((a, d) => a + d.weightAlkanes, 0);
+const sumUG = bsDays.reduce((a, d) => a + d.ugMints, 0);
+const sumDUG = bsDays.reduce((a, d) => a + d.dieselUg, 0);
+const blockspaceAll = sumW ? r1(sumWA / sumW) : 0;
+const bsLast = bsDays[bsDays.length - 1];
+const bsFirst = bsDays[0];
+const blockspaceLast = bsLast && bsLast.weightTotal ? r1(bsLast.weightAlkanes / bsLast.weightTotal) : 0;
+const dieselUgAll = sumUG ? r1(sumDUG / sumUG) : 0;
+const dieselUgFirst = bsFirst && bsFirst.ugMints ? r1(bsFirst.dieselUg / bsFirst.ugMints) : 0;
+const dieselUgLast = bsLast && bsLast.ugMints ? r1(bsLast.dieselUg / bsLast.ugMints) : 0;
+
 const data = {
   labels: rows.map((r) => mday(r.date)),
   txDaily: rows.map((r) => r1(alkShareCount(sumsOfRow(r)))),
@@ -69,6 +104,8 @@ const data = {
   feeBtcRestDaily: rows.map((r) => +feeBtcOnly(Math.max(0, r.feeTotalSats - r.feeAlkanesSats), r.blocksScanned).toFixed(3)),
   bytesAlkDaily: rows.map((r) => +bytesPerAlkanesTx(sumsOfRow(r)).toFixed(1)),
   bytesOtherDaily: rows.map((r) => +bytesPerOtherOpReturnTx(sumsOfRow(r)).toFixed(1)),
+  blockspaceDaily,
+  dieselUgDaily,
   donut: [donutAlk, donutRunes, donutOther],
   opReturnPie: [lastRow.txAlkanes, Math.max(0, lastRow.txWithOpReturn - lastRow.txAlkanes)],
   span: `${mday(rows[0].date)} – ${mday(rows[rows.length - 1].date)}`,
@@ -119,7 +156,12 @@ const html = `<!doctype html>
 <div class="wrap"><canvas id="o"></canvas></div>
 <p class="chartnote">Of every Bitcoin transaction that carries an OP_RETURN, <b>${r1(alkOfOpReturnShare(d30))}%</b> are Alkanes (last 30 days), and they account for <b>${r1(alkBytesShare(d30))}%</b> of all OP_RETURN data bytes. This is Alkanes' grip on OP_RETURN itself — independent of how many BTC tx use OP_RETURN at all.</p>
 <p class="chartnote">Tip: click a legend item to show/hide its line.</p>
-
+${hasBs ? `
+<h2>Alkanes' share of block space (by weight)</h2>
+<div class="legend"><span><span class="sw" style="background:var(--teal)"></span>Alkanes — % of total block weight</span></div>
+<div class="wrap"><canvas id="bs"></canvas></div>
+<p class="chartnote">This is the <b>literal block space</b> Alkanes occupy — transaction <i>weight</i>, the unit Bitcoin's block limit is actually denominated in (not byte counts, not transaction counts). Alkanes were <b>${blockspaceAll}%</b> of all block weight over the period and <b>${blockspaceLast}%</b> on the last measured day, up from under 1% at the start of the year. This is the honest "how much of Bitcoin is Alkanes" answer: by weight they are still a minority of block space, far below their share of transaction <i>count</i> (most Alkanes tx are tiny DIESEL mints). Measured directly from each transaction's weight via a metashrew/alkanes-rs indexer.</p>
+` : ''}
 <h2>Last day — share of OP_RETURN transactions</h2>
 <div class="legend"><span><span class="sw" style="background:var(--teal)"></span>Alkanes ${r1(alkOfOpReturnShare(latest))}%</span><span><span class="sw" style="background:#4a4a52"></span>Other OP_RETURN ${r1(1 - alkOfOpReturnShare(latest))}%</span></div>
 <div class="wrap" style="height:250px;max-width:380px"><canvas id="op"></canvas></div>
@@ -128,7 +170,12 @@ const html = `<!doctype html>
 <h2>DIESEL mints — share of all Bitcoin transactions</h2>
 <div class="legend"><span><span class="sw" style="background:var(--amber)"></span>DIESEL mints (% of all tx)</span></div>
 <div class="wrap" style="height:240px"><canvas id="m"></canvas></div>
-
+${hasBs ? `
+<h2>UNCOMMON•GOODS mints that are DIESEL</h2>
+<div class="legend"><span><span class="sw" style="background:var(--amber)"></span>DIESEL share of UNCOMMON•GOODS mints</span></div>
+<div class="wrap" style="height:240px"><canvas id="dug"></canvas></div>
+<p class="chartnote">UNCOMMON•GOODS (Rune <code>1:0</code>) rides along on almost every DIESEL mint. Of all UNCOMMON•GOODS mints each day, the share that are <i>also</i> DIESEL climbed from <b>${dieselUgFirst}%</b> early in the year to <b>${dieselUgLast}%</b> recently (<b>${dieselUgAll}%</b> over the whole period): when you see an UNCOMMON•GOODS mint today, it is almost always DIESEL "wearing Runes clothing." Detected as a runestone whose <code>mint</code> is Rune <code>1:0</code> on a DIESEL (cellpack <code>2:0</code> op&nbsp;77) transaction.</p>
+` : ''}
 <h2>OP_RETURN bytes (all time)</h2>
 <div class="legend"><span><span class="sw" style="background:var(--teal)"></span>Alkanes ${donutAlk}%</span><span><span class="sw" style="background:var(--amber)"></span>Runes ${donutRunes}%</span><span><span class="sw" style="background:#4a4a52"></span>Other ${donutOther}%</span></div>
 <div class="wrap" style="height:230px;max-width:360px"><canvas id="d"></canvas></div>
@@ -160,7 +207,7 @@ const html = `<!doctype html>
   <p>We read every Bitcoin block in the window and inspect each transaction's outputs. An output whose script starts with <code>6a</code> is an <b>OP_RETURN</b>; one starting <code>6a5d</code> is a Runestone.</p>
   <p>We decode the Runestone and if any protostone carries <b>protocol_tag = 1</b>, the transaction is <b>Alkanes</b>. A <b>DIESEL mint</b> is the specific case where the cellpack targets <code>2:0</code> with opcode <code>77</code> (the genesis alkane) — today that's the vast majority of all Alkanes activity.</p>
   <p><b>Share of transactions</b> = matching tx ÷ all tx. <b>Share of OP_RETURN bytes</b> = Alkanes OP_RETURN bytes ÷ all OP_RETURN bytes. Shares are unaffected by sampling; each day rests on ~24-48 sampled blocks (see <code>blocksScanned</code> in the CSV). Classification reuses the open-source <a href="https://github.com/Vdto88/alkanes-opreturn-decoder">alkanes-opreturn-decoder</a>.</p>
-  <p><b>Glossary.</b> <b>OP_RETURN penetration</b>: share of all BTC tx that carry an OP_RETURN. <b>Alkanes (tx)</b>: share of all BTC tx that are Alkanes. <b>Alkanes (bytes)</b>: share of OP_RETURN bytes that are Alkanes. <b>Runes</b>: OP_RETURN bytes that are Runestones but not Alkanes. <b>Alkanes excl. DIESEL</b>: Alkanes tx that aren't DIESEL mints — "real app" usage. <b>DIESEL</b>: mint of the genesis alkane (cellpack <code>2:0</code> op&nbsp;77). <b>Alkanes of OP_RETURN</b>: of tx that carry an OP_RETURN, the share that are Alkanes (by tx and by bytes). <b>Bytes per tx</b>: average OP_RETURN script size per transaction in each bucket. <b>Alkanes share of fee revenue</b>: Alkanes fees ÷ total fees (subsidy excluded).</p>
+  <p><b>Glossary.</b> <b>OP_RETURN penetration</b>: share of all BTC tx that carry an OP_RETURN. <b>Alkanes (tx)</b>: share of all BTC tx that are Alkanes. <b>Alkanes (bytes)</b>: share of OP_RETURN bytes that are Alkanes. <b>Runes</b>: OP_RETURN bytes that are Runestones but not Alkanes. <b>Alkanes excl. DIESEL</b>: Alkanes tx that aren't DIESEL mints — "real app" usage. <b>DIESEL</b>: mint of the genesis alkane (cellpack <code>2:0</code> op&nbsp;77). <b>Alkanes of OP_RETURN</b>: of tx that carry an OP_RETURN, the share that are Alkanes (by tx and by bytes). <b>Bytes per tx</b>: average OP_RETURN script size per transaction in each bucket. <b>Alkanes share of fee revenue</b>: Alkanes fees ÷ total fees (subsidy excluded).${hasBs ? ` <b>Share of block space (by weight)</b>: Alkanes tx weight ÷ total block weight — weight is the unit Bitcoin's 4M-weight-unit block limit is denominated in, so this is literal block space. <b>UNCOMMON•GOODS that are DIESEL</b>: of runestone mints of Rune <code>1:0</code> (UNCOMMON•GOODS), the share that are also DIESEL mints. Block weight and UNCOMMON•GOODS come from a metashrew/alkanes-rs indexer that reads each block directly.` : ''}</p>
 </div>
 <footer>Source data: <a href="./history.csv">history.csv</a> (one row per day). Bytes = full output script; coinbase included. Auto-updated daily from the alkanes-opreturn-scanner.</footer>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -200,9 +247,18 @@ const effChart=new Chart(eff,{type:'line',data:{labels:D.labels,datasets:[
 const faChart=new Chart(fa,{type:'line',data:{labels:D.labels,datasets:[
  {label:'Alkanes share of fees',data:D.feeAlkanesDaily,borderColor:'#2DBE8E',backgroundColor:'rgba(45,190,142,0.12)',fill:true,pointRadius:1,tension:.25,borderWidth:2}]},
  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'% of fee revenue'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
+${hasBs ? `
+const bsChart=new Chart(bs,{type:'line',data:{labels:D.labels,datasets:[
+ {label:'Alkanes share of block weight',data:D.blockspaceDaily,borderColor:'#2DBE8E',backgroundColor:'rgba(45,190,142,0.12)',fill:true,pointRadius:1,tension:.25,borderWidth:2,spanGaps:false}]},
+ options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'% of block weight'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
+const dugChart=new Chart(dug,{type:'line',data:{labels:D.labels,datasets:[
+ {label:'DIESEL share of UNCOMMON•GOODS mints',data:D.dieselUgDaily,borderColor:'#E9A23B',backgroundColor:'rgba(233,162,59,0.12)',fill:true,pointRadius:1,tension:.25,borderWidth:2,spanGaps:false}]},
+ options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'% are DIESEL'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
+` : ''}
 // Filtro de janela temporal (todos os gráficos de LINHA): seta x.min pela data, sem fatiar dados
 // (mantém c.dataIndex alinhado aos arrays de D, então tooltips seguem corretos). Rosca/pizza ficam fixas.
 const lineCharts=[gChart,mChart,fChart,oChart,effChart,fbChart,faChart];
+${hasBs ? `lineCharts.push(bsChart,dugChart);` : ''}
 function setRange(days){
   const min = days==='all' ? D.labels[0] : D.labels[Math.max(0, D.labels.length - days)];
   for(const c of lineCharts){ c.options.scales.x.min = min; c.update(); }
