@@ -39,6 +39,29 @@ npx tsx tools/seed-history.ts    # (1x) semeia o history.csv a partir do cache l
 
 `report.html` é standalone (abre no navegador, sem servidor).
 
+### Schema do `history.csv`
+
+Uma linha por dia (UTC). **Parse por NOME de coluna** (não por posição) — colunas podem ser
+anexadas no fim sem quebrar consumidores. Colunas (19):
+
+`date, fromHeight, toHeight, blocksScanned, totalTx, txWithOpReturn, txAlkanes, opReturnBytes,
+runestoneBytes, alkanesBytes, dieselMints, feeTotalSats, feeAlkanesSats, feeOpReturnSats, btcUsd,
+weightTotal, weightAlkanes, ugMints, dieselUg`
+
+As **4 últimas** (adicionadas em 2026-07-03) vêm do indexer metashrew/alkanes-rs (censo, todos os
+blocos do dia) e alimentam 2 gráficos:
+
+- `weightTotal` / `weightAlkanes` — weight (WU) total do dia e das tx Alkanes → **"Alkanes' share of
+  block space (by weight)"** = `weightAlkanes / weightTotal` (block space literal).
+- `ugMints` / `dieselUg` — mints do rune UNCOMMON•GOODS (`1:0`) e os que **também** são DIESEL →
+  **"UNCOMMON•GOODS mints that are DIESEL"** = `dieselUg / ugMints`. (Use `dieselUg`, **não**
+  `dieselMints`, como numerador — só `dieselUg` é o subconjunto DIESEL∩UG.)
+
+**Disponibilidade:** valores de weight/UG existem a partir de **2025-12-29** (extensão pro genesis
+do DIESEL, 2025-01-20, em andamento). Dia **sem** esses dados fica com **célula vazia** (não `0` —
+`0` é um valor real, ex. `dieselUg=0` no começo de 2025). As 15 primeiras colunas nunca mudam de
+ordem/nome.
+
 ### Automação (GitHub Actions)
 
 `.github/workflows/daily.yml` roda **todo dia** (cron) ou no botão "Run workflow": clona o decoder

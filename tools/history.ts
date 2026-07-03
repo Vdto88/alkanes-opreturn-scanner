@@ -19,10 +19,19 @@ export interface HistoryRow {
   feeAlkanesSats: number;  // fees das tx Alkanes
   feeOpReturnSats: number; // fees das tx com OP_RETURN
   btcUsd: number;          // preço representativo do BTC em USD no dia (0 se indisponível)
+  // Colunas do indexer (censo, weight/UG), anexadas no FIM (2026-07-03) pro consumidor externo
+  // (subfrost.io) renderizar os 2 gráficos do dashboard que só vinham do arquivo lateral.
+  // OPCIONAIS: `undefined` = SEM DADO (célula VAZIA no CSV, NÃO 0 — 0 é valor real, ex.
+  // dieselUg=0 no começo de 2025). Vêm do blockspace-daily.json / DayAgg do indexer.
+  weightTotal?: number;    // soma do weight (WU) de TODAS as tx dos blocos do dia (censo)
+  weightAlkanes?: number;  // soma do weight (WU) das tx Alkanes do dia (censo)
+  ugMints?: number;        // mints do rune UNCOMMON•GOODS (1:0) no dia (censo)
+  dieselUg?: number;       // mints DIESEL que TAMBÉM carregam UG (numerador do gráfico UG)
 }
 
 const COLS: (keyof HistoryRow)[] = [
   'date', 'fromHeight', 'toHeight', 'blocksScanned', 'totalTx', 'txWithOpReturn', 'txAlkanes', 'opReturnBytes', 'runestoneBytes', 'alkanesBytes', 'dieselMints', 'feeTotalSats', 'feeAlkanesSats', 'feeOpReturnSats', 'btcUsd',
+  'weightTotal', 'weightAlkanes', 'ugMints', 'dieselUg',
 ];
 
 export function readHistory(path: string): HistoryRow[] {
@@ -42,6 +51,12 @@ export function readHistory(path: string): HistoryRow[] {
       const v = at(col);
       return v !== undefined && v !== '' ? Number(v) : 0;
     };
+    // Igual ao num, mas célula VAZIA/ausente vira `undefined` (não 0) — as colunas novas
+    // de weight/UG distinguem "sem dado" (vazio) de um zero real (ex. dieselUg=0).
+    const numU = (col: string): number | undefined => {
+      const v = at(col);
+      return v !== undefined && v !== '' ? Number(v) : undefined;
+    };
     return {
       date: at('date') ?? '',
       fromHeight: num('fromHeight'),
@@ -58,6 +73,10 @@ export function readHistory(path: string): HistoryRow[] {
       feeAlkanesSats: num('feeAlkanesSats'),
       feeOpReturnSats: num('feeOpReturnSats'),
       btcUsd: num('btcUsd'),
+      weightTotal: numU('weightTotal'),
+      weightAlkanes: numU('weightAlkanes'),
+      ugMints: numU('ugMints'),
+      dieselUg: numU('dieselUg'),
     };
   });
 }

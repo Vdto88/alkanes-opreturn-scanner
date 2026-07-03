@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readHistory, writeHistory, upsert, rollup, alkShareCount, alkBytesShare, alkExDieselShareCount, alkOfOpReturnShare, bytesPerAlkanesTx, bytesPerOtherOpReturnTx, feeAlkanesShare, feeOpReturnShare, minerRevenueUsdDay, type HistoryRow, type Sums } from './history';
@@ -20,6 +20,41 @@ describe('history csv', () => {
 
   it('readHistory devolve [] quando não existe', () => {
     expect(readHistory(join(tmpdir(), 'nao-existe-xyz.csv'))).toEqual([]);
+  });
+
+  it('weight/UG: round-trip preserva número e 0 REAL; célula vazia vira undefined (≠ 0)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hist-'));
+    const path = join(dir, 'history.csv');
+    const withData: HistoryRow = { ...mk('2025-01-20', 18), weightTotal: 327363183, weightAlkanes: 2_000_000, ugMints: 78, dieselUg: 0 };
+    const noData = mk('2025-01-21', 20); // sem weight/UG
+    writeHistory(path, [withData, noData]);
+    const back = readHistory(path);
+    expect(back[0].weightTotal).toBe(327363183);
+    expect(back[0].dieselUg).toBe(0);            // 0 real preservado como 0
+    expect(back[1].weightTotal).toBeUndefined(); // sem dado ≠ 0
+    expect(back[1].dieselUg).toBeUndefined();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('sem weight/UG → header de 19 colunas e célula VAZIA (não 0) no CSV', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hist-'));
+    const path = join(dir, 'history.csv');
+    writeHistory(path, [mk('2025-01-21', 20)]);
+    const raw = readFileSync(path, 'utf8').trim().split('\n');
+    expect(raw[0].split(',').length).toBe(19);   // 15 + 4 novas
+    expect(raw[1].endsWith(',,,,')).toBe(true);   // 4 células vazias no fim
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('lê CSV antigo de 15 colunas (sem weight/UG) → campos novos undefined', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hist-'));
+    const path = join(dir, 'history.csv');
+    writeFileSync(path, 'date,fromHeight,toHeight,blocksScanned,totalTx,txWithOpReturn,txAlkanes,opReturnBytes,runestoneBytes,alkanesBytes,dieselMints,feeTotalSats,feeAlkanesSats,feeOpReturnSats,btcUsd\n2025-06-01,1,2,1,100,50,40,100,90,90,40,0,0,0,50000\n');
+    const back = readHistory(path);
+    expect(back[0].txAlkanes).toBe(40);
+    expect(back[0].weightTotal).toBeUndefined();
+    expect(back[0].ugMints).toBeUndefined();
+    rmSync(dir, { recursive: true, force: true });
   });
 
   it('upsert substitui a linha da mesma data e mantém ordenado', () => {
