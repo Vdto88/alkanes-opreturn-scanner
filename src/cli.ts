@@ -14,6 +14,7 @@ export interface CliOptions {
   sampleEvery: number;
   useCache: boolean;
   concurrency?: number;
+  cacheDir?: string;
 }
 
 export function parseArgs(argv: string[]): CliOptions {
@@ -29,6 +30,7 @@ export function parseArgs(argv: string[]): CliOptions {
     else if (a === '--sample') o.sampleEvery = Number(next());
     else if (a === '--no-cache') o.useCache = false;
     else if (a === '--concurrency') o.concurrency = Number(next());
+    else if (a === '--cache-dir') o.cacheDir = next();
   }
   return o;
 }
@@ -59,7 +61,7 @@ async function main(): Promise<void> {
   }
 
   console.error(`Varrendo blocos ${from}..${to} via ${o.source}${o.sampleEvery > 1 ? ` (amostra 1/${o.sampleEvery})` : ''}...`);
-  const result = await scanRange(from, to, { ...esploraOpts, sampleEvery: o.sampleEvery, useCache: o.useCache });
+  const result = await scanRange(from, to, { ...esploraOpts, sampleEvery: o.sampleEvery, useCache: o.useCache, cacheDir: o.cacheDir });
   if (result.blocksFailed > 0) console.error(`aviso: ${result.blocksFailed} bloco(s) pulado(s) por erro de fetch (após retries)`);
   const metrics = computeMetrics(result.aggregate);
   console.log(formatReport(result, metrics));

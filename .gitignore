@@ -4,3 +4,4 @@ cache/
 .env.*
 dist/
 *.log
+cache-gen/
