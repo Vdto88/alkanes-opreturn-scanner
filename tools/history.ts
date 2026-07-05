@@ -132,11 +132,22 @@ export const otherBytesShare = (s: Sums): number => (s.opReturnBytes ? Math.max(
 // Fees: quanto da receita de fee vem de Alkanes / OP_RETURN
 export const feeAlkanesShare = (s: Sums): number => (s.feeTotalSats ? s.feeAlkanesSats / s.feeTotalSats : 0);
 export const feeOpReturnShare = (s: Sums): number => (s.feeTotalSats ? s.feeOpReturnSats / s.feeTotalSats : 0);
+// Fee MÉDIA por tx (sats): das tx Alkanes vs das não-Alkanes. Mostra se DIESEL é "spam barato"
+// (paga pouca fee por tx) vs uma tx normal. 0 (não NaN) quando o balde está vazio.
+export const feePerAlkanesTx = (s: Sums): number => (s.txAlkanes ? s.feeAlkanesSats / s.txAlkanes : 0);
+export const feePerNonAlkanesTx = (s: Sums): number => {
+  const otherTx = s.totalTx - s.txAlkanes;
+  return otherTx > 0 ? Math.max(0, s.feeTotalSats - s.feeAlkanesSats) / otherTx : 0;
+};
 // Receita do minerador no dia (USD): fees extrapoladas da amostra pro dia cheio (×144/blocosAmostrados)
 // + subsídio fixo (3,125 BTC/bloco × 144), tudo × preço do BTC. 0 sem preço/amostra.
 const SUBSIDY_SATS = 312_500_000; // 3,125 BTC (blocos 930000–955153, entre halvings 840000 e 1050000)
 export const minerRevenueUsdDay = (r: HistoryRow): number =>
   (r.blocksScanned ? ((r.feeTotalSats / r.blocksScanned * 144 + 144 * SUBSIDY_SATS) / 1e8) * r.btcUsd : 0);
+// Estimativa de mints de DIESEL no dia INTEIRO: extrapola a amostra (mints/blocosAmostrados × 144).
+// 0 (não NaN) sem amostra. Base da curva "nascimento" (absoluta) e do acumulado.
+export const dieselMintsPerDay = (r: HistoryRow): number =>
+  (r.blocksScanned ? (r.dieselMints / r.blocksScanned) * 144 : 0);
 
 /** Data UTC (YYYY-MM-DD) deslocada por `days` a partir de hoje. */
 export function utcDate(days = 0): string {
