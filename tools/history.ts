@@ -27,10 +27,11 @@ export interface HistoryRow {
   weightAlkanes?: number;  // soma do weight (WU) das tx Alkanes do dia (censo)
   ugMints?: number;        // mints do rune UNCOMMON•GOODS (1:0) no dia (censo)
   dieselUg?: number;       // mints DIESEL que TAMBÉM carregam UG (numerador do gráfico UG)
-  // Contagem de tx do CENSO (dia REAL de blocos, não amostra) pro subfrost.io reproduzir o
-  // gráfico "Runestone tx: Alkanes vs Runes puros". CONTAGEM REAL do dia (raw, não extrapolada —
-  // o censo processa o dia inteiro). txAlkRunestone = tx Runestone que são Alkanes (protocol_tag=1);
-  // txPureRunes = tx Runestone que NÃO são Alkanes (Runes puras). Vazio = sem censo naquele dia.
+  // Contagem de tx do CENSO ESTIMADA pro dia inteiro (×144 / blocos do censo) pro subfrost.io
+  // reproduzir o gráfico "Runestone tx: Alkanes vs Runes puros" plotando DIRETO (não extrapolar de
+  // novo — o blocksScanned da linha é da amostra, base diferente). = txAlkAbsDaily/txRunesAbsDaily do
+  // build-report. txAlkRunestone = tx Runestone que são Alkanes (protocol_tag=1); txPureRunes =
+  // Runestone NÃO-Alkanes (Runes puras). Vazio = sem censo naquele dia (célula vazia, não 0).
   txAlkRunestone?: number;
   txPureRunes?: number;
 }
