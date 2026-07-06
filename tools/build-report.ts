@@ -105,6 +105,16 @@ const dieselPeak = Math.max(0, ...dieselPerDayDaily);
 const feePerAlkTxDaily = rows.map((r) => Math.round(feePerAlkanesTx(sumsOfRow(r))));
 const feePerOtherTxDaily = rows.map((r) => Math.round(feePerNonAlkanesTx(sumsOfRow(r))));
 
+// --- "Pure Runes vs Alkanes" (o gráfico do Gabe): o FLIP dos bytes de OP_RETURN ---
+// Séries já no `data`: bytesDaily = Alkanes (% dos bytes), runesDaily = Runes PUROS
+// (Runestone que NÃO é Alkanes). Aqui só os números da nota: começo (30 primeiros dias) vs
+// recente (30 últimos, = d30). O crossover Alkanes>Runes foi em abr/2025 (verificado no CSV).
+const early30 = rollup(rows.slice(0, 30), '0000-00-00');
+const runesEarly = r1(runesBytesShare(early30));
+const alkEarly = r1(alkBytesShare(early30));
+const runesRecent = r1(runesBytesShare(d30));
+const alkRecent = r1(alkBytesShare(d30));
+
 const data = {
   labels: rows.map((r) => mday(r.date)),
   txDaily: rows.map((r) => r1(alkShareCount(sumsOfRow(r)))),
@@ -213,6 +223,12 @@ ${hasBs ? `
 <div class="wrap" style="height:240px"><canvas id="dug"></canvas></div>
 <p class="chartnote">UNCOMMON•GOODS (Rune <code>1:0</code>) rides along on almost every DIESEL mint. Of all UNCOMMON•GOODS mints each day, the share that are <i>also</i> DIESEL climbed from <b>${dieselUgFirst}%</b> early in the year to <b>${dieselUgLast}%</b> recently (<b>${dieselUgAll}%</b> over the whole period): when you see an UNCOMMON•GOODS mint today, it is almost always DIESEL "wearing Runes clothing." Detected as a runestone whose <code>mint</code> is Rune <code>1:0</code> on a DIESEL (cellpack <code>2:0</code> op&nbsp;77) transaction.</p>
 ` : ''}
+<h2>Pure Runes vs Alkanes — share of OP_RETURN bytes</h2>
+<div class="legend" id="leg-rva"><span data-ds="0"><span class="sw" style="background:var(--teal)"></span>Alkanes</span><span data-ds="1"><span class="sw" style="background:var(--amber)"></span>Pure Runes (Runestone, <i>not</i> Alkanes)</span></div>
+<div class="wrap"><canvas id="rva"></canvas></div>
+<p class="chartnote">The honest answer to <i>"if I see UNCOMMON•GOODS / Runestone mints in almost every transaction, isn't the network mostly Runes?"</i> — <b>No.</b> ${hasBs ? `It only looks that way because <b>~${dieselUgAll}%</b> of those UNCOMMON•GOODS mints are DIESEL (chart above)` : `It only looks that way because almost all of those UNCOMMON•GOODS / Runestone mints are actually DIESEL`} — Alkanes riding <i>inside</i> a Runestone envelope. Strip those out and count only <b>pure Runes</b> (Runestone OP_RETURN that is <i>not</i> Alkanes) and the picture flips: pure Runes fell from <b>${runesEarly}%</b> of OP_RETURN bytes at the start (early 2025) to <b>${runesRecent}%</b> in the last 30 days, while Alkanes rose from <b>${alkEarly}%</b> to <b>${alkRecent}%</b>. The two lines <b>crossed over in April 2025</b> and never went back. Over the whole period Alkanes are <b>${donutAlk}%</b> of OP_RETURN bytes versus just <b>${donutRunes}%</b> pure Runes. The data on-chain is <b>Alkanes, not Runes.</b></p>
+<p class="chartnote">Tip: click a legend item to show/hide its line.</p>
+
 <h2>OP_RETURN bytes (all time)</h2>
 <div class="legend"><span><span class="sw" style="background:var(--teal)"></span>Alkanes ${donutAlk}%</span><span><span class="sw" style="background:var(--amber)"></span>Runes ${donutRunes}%</span><span><span class="sw" style="background:#4a4a52"></span>Other ${donutOther}%</span></div>
 <div class="wrap" style="height:230px;max-width:360px"><canvas id="d"></canvas></div>
@@ -311,6 +327,12 @@ const fptChart=new Chart(fpt,{type:'line',data:{labels:D.labels,datasets:[
  {label:'Non-Alkanes tx',data:D.feePerOtherTxDaily,borderColor:'#E9A23B',fill:false,pointRadius:0.5,tension:.25,borderWidth:2}]},
  options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y.toLocaleString('en-US')+' sats'}}},scales:{y:{min:0,grid:{color:grid},ticks:{callback:v=>v.toLocaleString('en-US')}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
 wireLegend('leg-fpt',fptChart);
+// Gabe: "Pure Runes vs Alkanes" — o flip dos bytes de OP_RETURN (Runes puros caindo, Alkanes subindo, crossover abr/2025)
+const rvaChart=new Chart(rva,{type:'line',data:{labels:D.labels,datasets:[
+ {label:'Alkanes',data:D.bytesDaily,borderColor:'#2DBE8E',backgroundColor:'rgba(45,190,142,0.12)',fill:true,pointRadius:1,tension:.25,borderWidth:2.5},
+ {label:'Pure Runes',data:D.runesDaily,borderColor:'#E9A23B',backgroundColor:'rgba(233,162,59,0.12)',fill:true,pointRadius:1,tension:.25,borderWidth:2.5}]},
+ options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y+'%'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
+wireLegend('leg-rva',rvaChart);
 ${hasBs ? `
 const bsChart=new Chart(bs,{type:'line',data:{labels:D.labels,datasets:[
  {label:'Alkanes share of block weight',data:D.blockspaceDaily,borderColor:'#2DBE8E',backgroundColor:'rgba(45,190,142,0.12)',fill:true,pointRadius:1,tension:.25,borderWidth:2,spanGaps:false}]},
@@ -321,7 +343,7 @@ const dugChart=new Chart(dug,{type:'line',data:{labels:D.labels,datasets:[
 ` : ''}
 // Filtro de janela temporal (todos os gráficos de LINHA): seta x.min pela data, sem fatiar dados
 // (mantém c.dataIndex alinhado aos arrays de D, então tooltips seguem corretos). Rosca/pizza ficam fixas.
-const lineCharts=[gChart,mChart,fChart,oChart,effChart,fbChart,faChart,denChart,dpdChart,dcumChart,fptChart];
+const lineCharts=[gChart,mChart,fChart,oChart,effChart,fbChart,faChart,denChart,dpdChart,dcumChart,fptChart,rvaChart];
 ${hasBs ? `lineCharts.push(bsChart,dugChart);` : ''}
 function setRange(days){
   const min = days==='all' ? D.labels[0] : D.labels[Math.max(0, D.labels.length - days)];
