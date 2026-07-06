@@ -36,13 +36,28 @@ describe('history csv', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('sem weight/UG → header de 19 colunas e célula VAZIA (não 0) no CSV', () => {
+  it('txAlkRunestone/txPureRunes (contagem do censo): round-trip preserva número e 0 REAL; vazio → undefined', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hist-'));
+    const path = join(dir, 'history.csv');
+    const withData: HistoryRow = { ...mk('2025-01-20', 7), txAlkRunestone: 7, txPureRunes: 8582 };
+    const zero: HistoryRow = { ...mk('2025-08-01', 999), txAlkRunestone: 500000, txPureRunes: 0 }; // Runes puros = 0 REAL
+    const noData = mk('2026-07-06', 20); // dia de amostra, sem censo → vazio
+    writeHistory(path, [withData, zero, noData]);
+    const back = readHistory(path);
+    expect(back[0].txPureRunes).toBe(8582);
+    expect(back[1].txPureRunes).toBe(0);          // 0 real preservado (não confundir com vazio)
+    expect(back[2].txAlkRunestone).toBeUndefined(); // sem censo ≠ 0
+    expect(back[2].txPureRunes).toBeUndefined();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('sem weight/UG/runestone → header de 21 colunas e célula VAZIA (não 0) no CSV', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hist-'));
     const path = join(dir, 'history.csv');
     writeHistory(path, [mk('2025-01-21', 20)]);
     const raw = readFileSync(path, 'utf8').trim().split('\n');
-    expect(raw[0].split(',').length).toBe(19);   // 15 + 4 novas
-    expect(raw[1].endsWith(',,,,')).toBe(true);   // 4 células vazias no fim
+    expect(raw[0].split(',').length).toBe(21);   // 15 + 4 (weight/UG) + 2 (txAlkRunestone/txPureRunes)
+    expect(raw[1].endsWith(',,,,,,')).toBe(true); // 6 células vazias no fim
     rmSync(dir, { recursive: true, force: true });
   });
 
