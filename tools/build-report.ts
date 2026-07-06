@@ -115,6 +115,19 @@ const alkEarly = r1(alkBytesShare(early30));
 const runesRecent = r1(runesBytesShare(d30));
 const alkRecent = r1(alkBytesShare(d30));
 
+// --- Fase A: +3 gráficos "Runes murchando" (dados prontos, sem re-scan) ---
+// #A1 bytes ABSOLUTOS extrapolados pro dia inteiro (×144/blocosAmostrados) — comparável entre
+// dias amostrados (antigos) e densos (recentes). Runes de verdade ENCOLHEU em termos absolutos
+// enquanto o espaço total de OP_RETURN explodiu, tudo Alkanes (não foi migração, foi substituição).
+const kbDayX = (bytes: number, blocks: number) => (blocks ? Math.round((bytes / blocks) * 144 / 1000) : 0);
+const runesKbEarly = kbDayX(early30.runestoneBytes - early30.alkanesBytes, early30.blocksScanned);
+const runesKbRecent = kbDayX(d30.runestoneBytes - d30.alkanesBytes, d30.blocksScanned);
+const alkKbRecent = kbDayX(d30.alkanesBytes, d30.blocksScanned);
+const opKbEarly = kbDayX(early30.opReturnBytes, early30.blocksScanned);
+const opKbRecent = kbDayX(d30.opReturnBytes, d30.blocksScanned);
+const opGrowthX = opKbEarly ? Math.round(opKbRecent / opKbEarly) : 0;
+const runesShrinkX = runesKbRecent ? Math.round(runesKbEarly / runesKbRecent) : 0;
+
 const data = {
   labels: rows.map((r) => mday(r.date)),
   txDaily: rows.map((r) => r1(alkShareCount(sumsOfRow(r)))),
@@ -131,6 +144,14 @@ const data = {
   feeBtcRestDaily: rows.map((r) => +feeBtcOnly(Math.max(0, r.feeTotalSats - r.feeAlkanesSats), r.blocksScanned).toFixed(3)),
   bytesAlkDaily: rows.map((r) => +bytesPerAlkanesTx(sumsOfRow(r)).toFixed(1)),
   bytesOtherDaily: rows.map((r) => +bytesPerOtherOpReturnTx(sumsOfRow(r)).toFixed(1)),
+  // Fase A #A1: bytes absolutos KB/dia (extrapolado ×144/blocos), escala log → null quando <1 KB
+  bytesAbsAlkDaily: rows.map((r) => { const k = r.blocksScanned ? Math.round((r.alkanesBytes / r.blocksScanned) * 144 / 1000) : 0; return k >= 1 ? k : null; }),
+  bytesAbsRunesDaily: rows.map((r) => { const k = r.blocksScanned ? Math.round((Math.max(0, r.runestoneBytes - r.alkanesBytes) / r.blocksScanned) * 144 / 1000) : 0; return k >= 1 ? k : null; }),
+  // Fase A #A3: composição 100% dos bytes de OP_RETURN (Alkanes + Runes puros + Other)
+  otherDaily: rows.map((r) => r1(otherBytesShare(sumsOfRow(r)))),
+  // Fase A #A2: UNCOMMON•GOODS por contagem (censo do indexer) — DIESEL vs não-DIESEL (Runes independente)
+  ugDieselDaily: rows.map((r) => { const b = bsMap.get(r.date); return b ? b.dieselUg : null; }),
+  ugNonDieselDaily: rows.map((r) => { const b = bsMap.get(r.date); return b ? Math.max(0, b.ugMints - b.dieselUg) : null; }),
   blockspaceDaily,
   dieselUgDaily,
   dieselPerDayDaily,
@@ -222,12 +243,29 @@ ${hasBs ? `
 <div class="legend"><span><span class="sw" style="background:var(--amber)"></span>DIESEL share of UNCOMMON•GOODS mints</span></div>
 <div class="wrap" style="height:240px"><canvas id="dug"></canvas></div>
 <p class="chartnote">UNCOMMON•GOODS (Rune <code>1:0</code>) rides along on almost every DIESEL mint. Of all UNCOMMON•GOODS mints each day, the share that are <i>also</i> DIESEL climbed from <b>${dieselUgFirst}%</b> early in the year to <b>${dieselUgLast}%</b> recently (<b>${dieselUgAll}%</b> over the whole period): when you see an UNCOMMON•GOODS mint today, it is almost always DIESEL "wearing Runes clothing." Detected as a runestone whose <code>mint</code> is Rune <code>1:0</code> on a DIESEL (cellpack <code>2:0</code> op&nbsp;77) transaction.</p>
+
+<h2>UNCOMMON•GOODS mints per day — taken over by DIESEL</h2>
+<div class="legend" id="leg-ugc"><span data-ds="0"><span class="sw" style="background:var(--teal)"></span>DIESEL (Alkanes)</span><span data-ds="1"><span class="sw" style="background:var(--amber)"></span>Independent Runes (not DIESEL)</span></div>
+<div class="wrap" style="height:260px"><canvas id="ugc"></canvas></div>
+<p class="chartnote">The same UNCOMMON•GOODS mints, now by <b>raw count per day</b> and split by what they really are: the teal band is UG mints that are actually <b>DIESEL</b> (Alkanes wearing a Runestone envelope); the amber band is UG mints that are <b>independent Runes</b>. The shape is the takeover story — early in 2025 most UG mints were genuine independent Runes (amber), then Alkanes/DIESEL swallowed UNCOMMON•GOODS: the DIESEL share climbed from <b>${dieselUgFirst}%</b> to <b>${dieselUgLast}%</b> (<b>${dieselUgAll}%</b> over the whole period, dragged down only by those early Runes-only months). The UG mints you see in almost every transaction <i>today</i> are Alkanes, not independent Runes.</p>
 ` : ''}
 <h2>Pure Runes vs Alkanes — share of OP_RETURN bytes</h2>
 <div class="legend" id="leg-rva"><span data-ds="0"><span class="sw" style="background:var(--teal)"></span>Alkanes</span><span data-ds="1"><span class="sw" style="background:var(--amber)"></span>Pure Runes (Runestone, <i>not</i> Alkanes)</span></div>
 <div class="wrap"><canvas id="rva"></canvas></div>
 <p class="chartnote">The honest answer to <i>"if I see UNCOMMON•GOODS / Runestone mints in almost every transaction, isn't the network mostly Runes?"</i> — <b>No.</b> ${hasBs ? `It only looks that way because <b>~${dieselUgAll}%</b> of those UNCOMMON•GOODS mints are DIESEL (chart above)` : `It only looks that way because almost all of those UNCOMMON•GOODS / Runestone mints are actually DIESEL`} — Alkanes riding <i>inside</i> a Runestone envelope. Strip those out and count only <b>pure Runes</b> (Runestone OP_RETURN that is <i>not</i> Alkanes) and the picture flips: pure Runes fell from <b>${runesEarly}%</b> of OP_RETURN bytes at the start (early 2025) to <b>${runesRecent}%</b> in the last 30 days, while Alkanes rose from <b>${alkEarly}%</b> to <b>${alkRecent}%</b>. The two lines <b>crossed over in April 2025</b> and never went back. Over the whole period Alkanes are <b>${donutAlk}%</b> of OP_RETURN bytes versus just <b>${donutRunes}%</b> pure Runes. The data on-chain is <b>Alkanes, not Runes.</b></p>
 <p class="chartnote">Tip: click a legend item to show/hide its line.</p>
+
+<h2>Real Runes vs Alkanes — absolute bytes per day</h2>
+<div class="legend" id="leg-rab"><span data-ds="0"><span class="sw" style="background:var(--teal)"></span>Alkanes (KB/day)</span><span data-ds="1"><span class="sw" style="background:var(--amber)"></span>Pure Runes (KB/day)</span></div>
+<div class="wrap"><canvas id="rab"></canvas></div>
+<p class="chartnote">Shares alone can mislead — <i>"Runes only lost share because Alkanes grew; maybe real Runes is growing too."</i> It isn't. This is the <b>absolute volume</b> of OP_RETURN data per day (log scale, extrapolated to a full day). Pure Runes <b>shrank</b> from ~<b>${runesKbEarly.toLocaleString('en-US')} KB/day</b> early in 2025 to ~<b>${runesKbRecent.toLocaleString('en-US')} KB/day</b> now (≈<b>${runesShrinkX}× less</b>), while total OP_RETURN grew ~<b>${opGrowthX}×</b> (${opKbEarly.toLocaleString('en-US')}→${opKbRecent.toLocaleString('en-US')} KB/day) — essentially <b>all</b> of it Alkanes (~1→<b>${alkKbRecent.toLocaleString('en-US')} KB/day</b>). Real Runes didn't migrate to Alkanes; it <b>withered</b> while Alkanes grew from nothing.</p>
+<p class="chartnote">Tip: click a legend item to show/hide its line.</p>
+
+<h2>OP_RETURN byte composition over time</h2>
+<div class="legend" id="leg-comp"><span data-ds="0"><span class="sw" style="background:var(--teal)"></span>Alkanes</span><span data-ds="1"><span class="sw" style="background:var(--amber)"></span>Pure Runes</span><span data-ds="2"><span class="sw" style="background:#4a4a52"></span>Other</span></div>
+<div class="wrap"><canvas id="comp"></canvas></div>
+<p class="chartnote">Every OP_RETURN data byte, decomposed and stacked to 100%. Watch the amber band — <b>pure Runes</b> (Runestone that is <i>not</i> Alkanes) — get squeezed to a sliver as the teal band — <b>Alkanes</b> — takes over almost the entire space. All-time the split is Alkanes <b>${donutAlk}%</b> / pure Runes <b>${donutRunes}%</b> / other <b>${donutOther}%</b>. Same underlying data as the two-line chart above, shown as territory.</p>
+<p class="chartnote">Tip: click a legend item to show/hide its band.</p>
 
 <h2>OP_RETURN bytes (all time)</h2>
 <div class="legend"><span><span class="sw" style="background:var(--teal)"></span>Alkanes ${donutAlk}%</span><span><span class="sw" style="background:var(--amber)"></span>Runes ${donutRunes}%</span><span><span class="sw" style="background:#4a4a52"></span>Other ${donutOther}%</span></div>
@@ -333,6 +371,19 @@ const rvaChart=new Chart(rva,{type:'line',data:{labels:D.labels,datasets:[
  {label:'Pure Runes',data:D.runesDaily,borderColor:'#E9A23B',backgroundColor:'rgba(233,162,59,0.12)',fill:true,pointRadius:1,tension:.25,borderWidth:2.5}]},
  options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y+'%'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
 wireLegend('leg-rva',rvaChart);
+// Fase A #A1: bytes ABSOLUTOS KB/dia (log) — Runes murchou enquanto Alkanes explodiu do zero
+const rabChart=new Chart(rab,{type:'line',data:{labels:D.labels,datasets:[
+ {label:'Alkanes',data:D.bytesAbsAlkDaily,borderColor:'#2DBE8E',fill:false,pointRadius:0.5,tension:.25,borderWidth:2,spanGaps:false},
+ {label:'Pure Runes',data:D.bytesAbsRunesDaily,borderColor:'#E9A23B',fill:false,pointRadius:0.5,tension:.25,borderWidth:2,spanGaps:false}]},
+ options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y==null?'—':c.parsed.y.toLocaleString('en-US')+' KB/day')}}},scales:{y:{type:'logarithmic',grid:{color:grid},ticks:{callback:v=>{const l=Math.log10(v);if(l!==Math.floor(l))return'';return v>=1000?(v/1000)+'k':''+v;}}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
+wireLegend('leg-rab',rabChart);
+// Fase A #A3: composição 100% empilhada dos bytes de OP_RETURN (a "tomada de território")
+const compChart=new Chart(comp,{type:'line',data:{labels:D.labels,datasets:[
+ {label:'Alkanes',data:D.bytesDaily,borderColor:'#2DBE8E',backgroundColor:'rgba(45,190,142,0.35)',fill:true,pointRadius:0,tension:.1,borderWidth:1,stack:'c'},
+ {label:'Pure Runes',data:D.runesDaily,borderColor:'#E9A23B',backgroundColor:'rgba(233,162,59,0.35)',fill:true,pointRadius:0,tension:.1,borderWidth:1,stack:'c'},
+ {label:'Other',data:D.otherDaily,borderColor:'#6f6f78',backgroundColor:'rgba(120,120,128,0.30)',fill:true,pointRadius:0,tension:.1,borderWidth:1,stack:'c'}]},
+ options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y+'%'}}},scales:{y:{min:0,max:100,stacked:true,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
+wireLegend('leg-comp',compChart);
 ${hasBs ? `
 const bsChart=new Chart(bs,{type:'line',data:{labels:D.labels,datasets:[
  {label:'Alkanes share of block weight',data:D.blockspaceDaily,borderColor:'#2DBE8E',backgroundColor:'rgba(45,190,142,0.12)',fill:true,pointRadius:1,tension:.25,borderWidth:2,spanGaps:false}]},
@@ -340,11 +391,17 @@ const bsChart=new Chart(bs,{type:'line',data:{labels:D.labels,datasets:[
 const dugChart=new Chart(dug,{type:'line',data:{labels:D.labels,datasets:[
  {label:'DIESEL share of UNCOMMON•GOODS mints',data:D.dieselUgDaily,borderColor:'#E9A23B',backgroundColor:'rgba(233,162,59,0.12)',fill:true,pointRadius:1,tension:.25,borderWidth:2,spanGaps:false}]},
  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'% are DIESEL'}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
+// Fase A #A2: UNCOMMON•GOODS por CONTAGEM/dia (censo) empilhado — DIESEL vs Runes independente (fiapo)
+const ugcChart=new Chart(ugc,{type:'line',data:{labels:D.labels,datasets:[
+ {label:'DIESEL',data:D.ugDieselDaily,borderColor:'#2DBE8E',backgroundColor:'rgba(45,190,142,0.30)',fill:true,pointRadius:0,tension:.2,borderWidth:1,stack:'u',spanGaps:false},
+ {label:'Independent Runes',data:D.ugNonDieselDaily,borderColor:'#E9A23B',backgroundColor:'rgba(233,162,59,0.35)',fill:true,pointRadius:0,tension:.2,borderWidth:1,stack:'u',spanGaps:false}]},
+ options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y==null?'—':c.parsed.y.toLocaleString('en-US'))+' mints'}}},scales:{y:{min:0,stacked:true,grid:{color:grid},ticks:{callback:v=>v.toLocaleString('en-US')}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
+wireLegend('leg-ugc',ugcChart);
 ` : ''}
 // Filtro de janela temporal (todos os gráficos de LINHA): seta x.min pela data, sem fatiar dados
 // (mantém c.dataIndex alinhado aos arrays de D, então tooltips seguem corretos). Rosca/pizza ficam fixas.
-const lineCharts=[gChart,mChart,fChart,oChart,effChart,fbChart,faChart,denChart,dpdChart,dcumChart,fptChart,rvaChart];
-${hasBs ? `lineCharts.push(bsChart,dugChart);` : ''}
+const lineCharts=[gChart,mChart,fChart,oChart,effChart,fbChart,faChart,denChart,dpdChart,dcumChart,fptChart,rvaChart,rabChart,compChart];
+${hasBs ? `lineCharts.push(bsChart,dugChart,ugcChart);` : ''}
 function setRange(days){
   const min = days==='all' ? D.labels[0] : D.labels[Math.max(0, D.labels.length - days)];
   for(const c of lineCharts){ c.options.scales.x.min = min; c.update(); }
