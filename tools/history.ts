@@ -27,11 +27,17 @@ export interface HistoryRow {
   weightAlkanes?: number;  // soma do weight (WU) das tx Alkanes do dia (censo)
   ugMints?: number;        // mints do rune UNCOMMON•GOODS (1:0) no dia (censo)
   dieselUg?: number;       // mints DIESEL que TAMBÉM carregam UG (numerador do gráfico UG)
+  // Contagem de tx do CENSO (dia REAL de blocos, não amostra) pro subfrost.io reproduzir o
+  // gráfico "Runestone tx: Alkanes vs Runes puros". CONTAGEM REAL do dia (raw, não extrapolada —
+  // o censo processa o dia inteiro). txAlkRunestone = tx Runestone que são Alkanes (protocol_tag=1);
+  // txPureRunes = tx Runestone que NÃO são Alkanes (Runes puras). Vazio = sem censo naquele dia.
+  txAlkRunestone?: number;
+  txPureRunes?: number;
 }
 
 const COLS: (keyof HistoryRow)[] = [
   'date', 'fromHeight', 'toHeight', 'blocksScanned', 'totalTx', 'txWithOpReturn', 'txAlkanes', 'opReturnBytes', 'runestoneBytes', 'alkanesBytes', 'dieselMints', 'feeTotalSats', 'feeAlkanesSats', 'feeOpReturnSats', 'btcUsd',
-  'weightTotal', 'weightAlkanes', 'ugMints', 'dieselUg',
+  'weightTotal', 'weightAlkanes', 'ugMints', 'dieselUg', 'txAlkRunestone', 'txPureRunes',
 ];
 
 export function readHistory(path: string): HistoryRow[] {
@@ -77,6 +83,8 @@ export function readHistory(path: string): HistoryRow[] {
       weightAlkanes: numU('weightAlkanes'),
       ugMints: numU('ugMints'),
       dieselUg: numU('dieselUg'),
+      txAlkRunestone: numU('txAlkRunestone'),
+      txPureRunes: numU('txPureRunes'),
     };
   });
 }
