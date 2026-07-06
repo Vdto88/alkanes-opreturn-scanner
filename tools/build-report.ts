@@ -26,6 +26,9 @@ if (rows.length === 0) {
 interface BlockspaceDay {
   date: string; weightTotal: number; weightAlkanes: number;
   ugMints: number; dieselUg: number; dieselMints: number; blocksScanned: number;
+  // Fase B: contagem de tx do censo (mesmo denominador). Opcionais — só presentes após o
+  // re-export com txRunes (run/refresh-blockspace-fy.sh); ausentes ⇒ gráficos de contagem não renderizam.
+  txAlkanes?: number; txRunes?: number;
 }
 const bsPath = join(dirname(historyPath) || '.', 'blockspace-daily.json');
 const bsDays: BlockspaceDay[] = existsSync(bsPath) ? JSON.parse(readFileSync(bsPath, 'utf8')) : [];
@@ -128,6 +131,24 @@ const opKbRecent = kbDayX(d30.opReturnBytes, d30.blocksScanned);
 const opGrowthX = opKbEarly ? Math.round(opKbRecent / opKbEarly) : 0;
 const runesShrinkX = runesKbRecent ? Math.round(runesKbEarly / runesKbRecent) : 0;
 
+// --- Fase B: contagem de tx do censo — "Runestone tx: Alkanes vs Runes puros" ---
+// Toda tx Runestone (envelope 6a5d) é ou Alkanes (protostone protocol_tag=1) ou Rune puro.
+// Dado vem do blockspace-daily.json (censo); só presente após o re-export com txRunes.
+const hasTxRunes = hasBs && bsDays[0]?.txRunes !== undefined;
+const bsSum = (arr: BlockspaceDay[], f: 'txAlkanes' | 'txRunes' | 'blocksScanned') =>
+  arr.reduce((a, d) => a + ((d[f] as number) || 0), 0);
+const rtxShare = (arr: BlockspaceDay[]) => { const t = bsSum(arr, 'txAlkanes') + bsSum(arr, 'txRunes'); return t ? r1(bsSum(arr, 'txAlkanes') / t) : 0; };
+const rtxKd = (arr: BlockspaceDay[], f: 'txAlkanes' | 'txRunes') => { const b = bsSum(arr, 'blocksScanned'); return b ? Math.round((bsSum(arr, f) / b) * 144) : 0; };
+const bsEar = bsDays.slice(0, 30);
+const bsRec = bsDays.slice(-30);
+const rtxAlkEarly = rtxShare(bsEar);
+const rtxAlkRecent = rtxShare(bsRec);
+const rtxAlkAll = rtxShare(bsDays);
+const txRunesKdEarly = rtxKd(bsEar, 'txRunes');
+const txRunesKdRecent = rtxKd(bsRec, 'txRunes');
+const txAlkKdRecent = rtxKd(bsRec, 'txAlkanes');
+const txRunesShrinkX = txRunesKdRecent ? Math.round(txRunesKdEarly / txRunesKdRecent) : 0;
+
 const data = {
   labels: rows.map((r) => mday(r.date)),
   txDaily: rows.map((r) => r1(alkShareCount(sumsOfRow(r)))),
@@ -152,6 +173,11 @@ const data = {
   // Fase A #A2: UNCOMMON•GOODS por contagem (censo do indexer) — DIESEL vs não-DIESEL (Runes independente)
   ugDieselDaily: rows.map((r) => { const b = bsMap.get(r.date); return b ? b.dieselUg : null; }),
   ugNonDieselDaily: rows.map((r) => { const b = bsMap.get(r.date); return b ? Math.max(0, b.ugMints - b.dieselUg) : null; }),
+  // Fase B: das tx Runestone (censo), share Alkanes vs Runes puro; e contagem absoluta/dia (×144, log)
+  rtxAlkShareDaily: rows.map((r) => { const b = bsMap.get(r.date); if (!b || b.txRunes === undefined) return null; const t = (b.txAlkanes || 0) + (b.txRunes || 0); return t ? r1((b.txAlkanes || 0) / t) : null; }),
+  rtxRunesShareDaily: rows.map((r) => { const b = bsMap.get(r.date); if (!b || b.txRunes === undefined) return null; const t = (b.txAlkanes || 0) + (b.txRunes || 0); return t ? r1((b.txRunes || 0) / t) : null; }),
+  txAlkAbsDaily: rows.map((r) => { const b = bsMap.get(r.date); if (!b || b.txRunes === undefined || !b.blocksScanned) return null; const v = Math.round(((b.txAlkanes || 0) / b.blocksScanned) * 144); return v >= 1 ? v : null; }),
+  txRunesAbsDaily: rows.map((r) => { const b = bsMap.get(r.date); if (!b || b.txRunes === undefined || !b.blocksScanned) return null; const v = Math.round(((b.txRunes || 0) / b.blocksScanned) * 144); return v >= 1 ? v : null; }),
   blockspaceDaily,
   dieselUgDaily,
   dieselPerDayDaily,
@@ -266,7 +292,19 @@ ${hasBs ? `
 <div class="wrap"><canvas id="comp"></canvas></div>
 <p class="chartnote">Every OP_RETURN data byte, decomposed and stacked to 100%. Watch the amber band — <b>pure Runes</b> (Runestone that is <i>not</i> Alkanes) — get squeezed to a sliver as the teal band — <b>Alkanes</b> — takes over almost the entire space. All-time the split is Alkanes <b>${donutAlk}%</b> / pure Runes <b>${donutRunes}%</b> / other <b>${donutOther}%</b>. Same underlying data as the two-line chart above, shown as territory.</p>
 <p class="chartnote">Tip: click a legend item to show/hide its band.</p>
+${hasTxRunes ? `
+<h2>Runestone transactions — Alkanes vs pure Runes</h2>
+<div class="legend" id="leg-rtx"><span data-ds="0"><span class="sw" style="background:var(--teal)"></span>Alkanes</span><span data-ds="1"><span class="sw" style="background:var(--amber)"></span>Pure Runes</span></div>
+<div class="wrap"><canvas id="rtx"></canvas></div>
+<p class="chartnote">Bytes are one thing — but what about the transactions people actually <i>see</i>? Every Runestone transaction (the <code>6a5d</code> envelope that reads as "Runes") is either an <b>Alkanes</b> protostone or a <b>pure Rune</b>. By count, Alkanes went from <b>${rtxAlkEarly}%</b> of all Runestone transactions at the start of 2025 to <b>${rtxAlkRecent}%</b> now. So when you see a Runestone in a transaction <i>today</i>, it is <b>${rtxAlkRecent}%</b> likely to be Alkanes, not an independent Rune (<b>${rtxAlkAll}%</b> over the whole period, dragged down by the early Runes-only months). This is the honest answer to <i>"how is it Alkanes if I see Runestone mints everywhere?"</i></p>
+<p class="chartnote">Tip: click a legend item to show/hide its line.</p>
 
+<h2>Runestone transactions per day — Alkanes vs pure Runes (count)</h2>
+<div class="legend" id="leg-rtc"><span data-ds="0"><span class="sw" style="background:var(--teal)"></span>Alkanes tx/day</span><span data-ds="1"><span class="sw" style="background:var(--amber)"></span>Pure Runes tx/day</span></div>
+<div class="wrap"><canvas id="rtc"></canvas></div>
+<p class="chartnote">The same by <b>raw volume</b> (log scale, extrapolated to a full day). Pure-Rune transactions fell from ~<b>${txRunesKdEarly.toLocaleString('en-US')}/day</b> to ~<b>${txRunesKdRecent.toLocaleString('en-US')}/day</b> (≈<b>${txRunesShrinkX}× fewer</b>), while Alkanes transactions went from a handful to ~<b>${txAlkKdRecent.toLocaleString('en-US')}/day</b>. Independent Runes didn't vanish entirely — a few thousand a day persist — but they stopped growing and were buried by Alkanes.</p>
+<p class="chartnote">Tip: click a legend item to show/hide its line.</p>
+` : ''}
 <h2>OP_RETURN bytes (all time)</h2>
 <div class="legend"><span><span class="sw" style="background:var(--teal)"></span>Alkanes ${donutAlk}%</span><span><span class="sw" style="background:var(--amber)"></span>Runes ${donutRunes}%</span><span><span class="sw" style="background:#4a4a52"></span>Other ${donutOther}%</span></div>
 <div class="wrap" style="height:230px;max-width:360px"><canvas id="d"></canvas></div>
@@ -384,6 +422,20 @@ const compChart=new Chart(comp,{type:'line',data:{labels:D.labels,datasets:[
  {label:'Other',data:D.otherDaily,borderColor:'#6f6f78',backgroundColor:'rgba(120,120,128,0.30)',fill:true,pointRadius:0,tension:.1,borderWidth:1,stack:'c'}]},
  options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y+'%'}}},scales:{y:{min:0,max:100,stacked:true,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
 wireLegend('leg-comp',compChart);
+${hasTxRunes ? `
+// Fase B #B1: das tx Runestone, share Alkanes vs Runes puro (contagem) — o flip por tx
+const rtxChart=new Chart(rtx,{type:'line',data:{labels:D.labels,datasets:[
+ {label:'Alkanes',data:D.rtxAlkShareDaily,borderColor:'#2DBE8E',fill:false,pointRadius:1,tension:.25,borderWidth:2.5,spanGaps:false},
+ {label:'Pure Runes',data:D.rtxRunesShareDaily,borderColor:'#E9A23B',fill:false,pointRadius:1,tension:.25,borderWidth:2.5,spanGaps:false}]},
+ options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y==null?'—':c.parsed.y+'% of Runestone tx')}}},scales:{y:{min:0,max:100,grid:{color:grid},ticks:{callback:pc,stepSize:20}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
+wireLegend('leg-rtx',rtxChart);
+// Fase B #B2: contagem absoluta de tx/dia (log) — Runes puros caindo, Alkanes explodindo
+const rtcChart=new Chart(rtc,{type:'line',data:{labels:D.labels,datasets:[
+ {label:'Alkanes tx',data:D.txAlkAbsDaily,borderColor:'#2DBE8E',fill:false,pointRadius:0.5,tension:.25,borderWidth:2,spanGaps:false},
+ {label:'Pure Runes tx',data:D.txRunesAbsDaily,borderColor:'#E9A23B',fill:false,pointRadius:0.5,tension:.25,borderWidth:2,spanGaps:false}]},
+ options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y==null?'—':c.parsed.y.toLocaleString('en-US')+' tx/day')}}},scales:{y:{type:'logarithmic',grid:{color:grid},ticks:{callback:v=>{const l=Math.log10(v);if(l!==Math.floor(l))return'';return v>=1000?(v/1000)+'k':''+v;}}},x:{grid:{display:false},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12}}}}});
+wireLegend('leg-rtc',rtcChart);
+` : ''}
 ${hasBs ? `
 const bsChart=new Chart(bs,{type:'line',data:{labels:D.labels,datasets:[
  {label:'Alkanes share of block weight',data:D.blockspaceDaily,borderColor:'#2DBE8E',backgroundColor:'rgba(45,190,142,0.12)',fill:true,pointRadius:1,tension:.25,borderWidth:2,spanGaps:false}]},
@@ -401,6 +453,7 @@ wireLegend('leg-ugc',ugcChart);
 // Filtro de janela temporal (todos os gráficos de LINHA): seta x.min pela data, sem fatiar dados
 // (mantém c.dataIndex alinhado aos arrays de D, então tooltips seguem corretos). Rosca/pizza ficam fixas.
 const lineCharts=[gChart,mChart,fChart,oChart,effChart,fbChart,faChart,denChart,dpdChart,dcumChart,fptChart,rvaChart,rabChart,compChart];
+${hasTxRunes ? `lineCharts.push(rtxChart,rtcChart);` : ''}
 ${hasBs ? `lineCharts.push(bsChart,dugChart,ugcChart);` : ''}
 function setRange(days){
   const min = days==='all' ? D.labels[0] : D.labels[Math.max(0, D.labels.length - days)];
