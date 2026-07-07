@@ -230,7 +230,7 @@ def line_pct(fname,title,desc,sub,series,key,color=GREEN,area=GREEN,smooth=True)
     open(os.path.join(OUT,fname),"w",encoding="utf-8").write(s)
 
 # ---- multi-line percent chart with legend ----
-def multiline_pct(fname,title,desc,sub,series,keys,smooth=True):
+def multiline_pct(fname,title,desc,sub,series,keys,smooth=True,ylabel=None):
     w,h=680,290; x0,x1=70,650; y0,y1=70,236
     n=len(series)
     def X(i): return x0+(x1-x0)*i/(n-1) if n>1 else x0
@@ -246,6 +246,9 @@ def multiline_pct(fname,title,desc,sub,series,keys,smooth=True):
         base=lab=="0%"; col=NEUT_D if base else GRID; dash="" if base else " "+GDASH
         s+=f'<line x1="{x0}" y1="{yy:.1f}" x2="{x1}" y2="{yy:.1f}" stroke="{col}" stroke-width="1"{dash}/>\n'
         s+=f'<text x="62" y="{yy+4:.1f}" font-size="11" fill="{T_MUTE}" text-anchor="end">{lab}</text>\n'
+    if ylabel:
+        ym=(y0+y1)/2
+        s+=f'<text x="14" y="{ym:.1f}" font-size="11" fill="{T_MUTE}" text-anchor="middle" transform="rotate(-90 14 {ym:.1f})">{esc(ylabel)}</text>\n'
     for key,color,label in keys:
         vals=mov(series,key) if smooth else [r[key] for r in series]
         pts=" ".join(f"{X(i):.1f},{Y(v):.1f}" for i,v in enumerate(vals))
@@ -855,14 +858,16 @@ value_area("fig-60-miner-revenue.svg",
 
 # ============ FIG-SITE SET — 1:1 mirror of subfrost.io/metrics (21 charts, site order & titles,
 # raw daily like the site, full window since DIESEL genesis; article v2 uses these) ============
-W_FULL=f"daily, since DIESEL genesis 880,000, {gen_start} to {gen_end}"
+# Gabe review 2026-07-07: datas fora dos títulos (o eixo X já as mostra)
+W_FULL="daily, since DIESEL genesis 880,000"
 
 multiline_pct("fig-site-01-daily-share.svg",
     "Daily Alkanes share",
     "Daily Alkanes share of all Bitcoin transactions alongside the share of all transactions that carry an OP_RETURN.",
     f"Daily Alkanes share ({W_FULL})",
     rows,
-    [("p_alkTx",GREEN,"Transactions"),("p_opTx",NEUT_D,"OP_RETURN penetration")],smooth=False)
+    [("p_alkTx",GREEN,"Transactions"),("p_opTx",NEUT_D,"OP_RETURN penetration")],smooth=False,
+    ylabel="Share of all Bitcoin transactions")
 
 multiline_pct("fig-site-02-opreturn-share.svg",
     "Alkanes' share of OP_RETURN",
@@ -879,11 +884,11 @@ line_pct("fig-site-03-weight-share.svg",
 
 multiline_pct("fig-site-04-four-answers.svg",
     "How much of Bitcoin is Alkanes? Four answers",
-    "Alkanes share of Bitcoin by transaction count, OP_RETURN bytes, block weight and miner fees, daily since genesis.",
+    "Alkanes share of Bitcoin by transaction count, block weight, miner fees and OP_RETURN bytes, daily since genesis.",
     f"How much of Bitcoin is Alkanes? Four answers ({W_FULL})",
     WR,
-    [("p_alkTx",GREEN,"Transactions"),("p_alkB",ORANGE,"OP_RETURN bytes"),
-     ("p_weight",LAV,"Block weight"),("p_feeA",GOLD,"Miner fees")],smooth=False)
+    [("p_alkTx",GREEN,"Transaction count"),("p_weight",LAV,"Block weight"),
+     ("p_feeA",GOLD,"Miner fees"),("p_alkB",ORANGE,"OP_RETURN bytes")],smooth=False)
 
 donut("fig-site-05-lastday-donut.svg",
     "Last day — share of OP_RETURN transactions",
