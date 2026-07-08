@@ -883,12 +883,12 @@ line_pct("fig-site-03-weight-share.svg",
     WR,"p_weight",smooth=False)
 
 multiline_pct("fig-site-04-four-answers.svg",
-    "How much of Bitcoin is Alkanes? Four answers",
-    "Alkanes share of Bitcoin by transaction count, block weight, miner fees and OP_RETURN bytes, daily since genesis.",
-    f"How much of Bitcoin is Alkanes? Four answers ({W_FULL})",
+    "How much of Bitcoin is Alkanes? Three answers",
+    "Alkanes share of Bitcoin by transaction count, block weight and OP_RETURN bytes, daily since genesis.",
+    f"How much of Bitcoin is Alkanes? Three answers ({W_FULL})",
     WR,
     [("p_alkTx",GREEN,"Transaction count"),("p_weight",LAV,"Block weight"),
-     ("p_feeA",GOLD,"Miner fees"),("p_alkB",ORANGE,"OP_RETURN bytes")],smooth=False)
+     ("p_alkB",ORANGE,"OP_RETURN bytes")],smooth=False)  # Gabe review 2026-07-08: miner fees removido daqui (introduzido só nas figuras de fee posteriores); filename mantido p/ não trocar o src do artigo
 
 donut("fig-site-05-lastday-donut.svg",
     "Last day — share of OP_RETURN transactions",
