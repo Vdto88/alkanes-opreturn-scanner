@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { readHistory, writeHistory, upsert, type HistoryRow } from './history';
+import { readHistory, writeHistory, upsert, upsertMerge, type HistoryRow } from './history';
 import { readContracts, writeContracts, upsertContracts } from './contracts';
 import { fetchRange } from './price';
 
@@ -71,7 +71,9 @@ for (const b of blocks) {
 }
 
 let rows = merge ? readHistory(historyPath) : [];
-for (const r of byDate.values()) rows = upsert(rows, r);
+// modo --merge: upsertMerge não deixa uma re-varredura PARCIAL (cache efêmero do Actions)
+// rebaixar um dia já censado, e preserva o enriquecimento/preço já presentes.
+for (const r of byDate.values()) rows = merge ? upsertMerge(rows, r) : upsert(rows, r);
 
 // preço BTC/USD por dia (não derruba o build se a API falhar)
 if (rows.length > 0) {

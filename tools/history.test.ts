@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readHistory, writeHistory, upsert, rollup, alkShareCount, alkBytesShare, alkExDieselShareCount, alkOfOpReturnShare, bytesPerAlkanesTx, bytesPerOtherOpReturnTx, feeAlkanesShare, feeOpReturnShare, feePerAlkanesTx, feePerNonAlkanesTx, dieselMintsPerDay, minerRevenueUsdDay, type HistoryRow, type Sums } from './history';
+import { readHistory, writeHistory, upsert, upsertMerge, mergeDay, rollup, alkShareCount, alkBytesShare, alkExDieselShareCount, alkOfOpReturnShare, bytesPerAlkanesTx, bytesPerOtherOpReturnTx, feeAlkanesShare, feeOpReturnShare, feePerAlkanesTx, feePerNonAlkanesTx, dieselMintsPerDay, minerRevenueUsdDay, type HistoryRow, type Sums } from './history';
 
 const mk = (date: string, txAlkanes: number, totalTx = 100, alkanesBytes = 90, opReturnBytes = 100): HistoryRow => ({
   date, fromHeight: 1, toHeight: 2, blocksScanned: 1, totalTx, txWithOpReturn: 50, txAlkanes, opReturnBytes, runestoneBytes: alkanesBytes, alkanesBytes, dieselMints: txAlkanes, feeTotalSats: 0, feeAlkanesSats: 0, feeOpReturnSats: 0, btcUsd: 0,
@@ -78,6 +78,46 @@ describe('history csv', () => {
     rows = upsert(rows, mk('2026-06-20', 55)); // substitui
     expect(rows.map((r) => r.date)).toEqual(['2026-06-19', '2026-06-20']);
     expect(rows[1].txAlkanes).toBe(55);
+  });
+
+  it('mergeDay: censo cheio faz UPGRADE de amostra (mais blocos vence)', () => {
+    const sample = { ...mk('2026-07-06', 100), blocksScanned: 24, totalTx: 2400 };
+    const census = { ...mk('2026-07-06', 500), blocksScanned: 144, totalTx: 14400 };
+    const m = mergeDay(sample, census);
+    expect(m.blocksScanned).toBe(144);
+    expect(m.totalTx).toBe(14400);
+  });
+
+  it('mergeDay: re-varredura PARCIAL não rebaixa um dia mais cheio (bug dos dias pela metade)', () => {
+    const full = { ...mk('2026-06-27', 500), blocksScanned: 155, totalTx: 15500 };
+    const partial = { ...mk('2026-06-27', 5), blocksScanned: 5, totalTx: 500 };
+    const m = mergeDay(full, partial);
+    expect(m.blocksScanned).toBe(155);
+    expect(m.totalTx).toBe(15500);
+  });
+
+  it('mergeDay: preserva enriquecimento (weight/UG/runestone, incl. 0 REAL) quando o censo troca o core', () => {
+    const existing: HistoryRow = { ...mk('2026-06-26', 24), blocksScanned: 24, weightTotal: 5, weightAlkanes: 2, ugMints: 9, dieselUg: 0, txAlkRunestone: 7, txPureRunes: 3 };
+    const census = { ...mk('2026-06-26', 500), blocksScanned: 144 }; // o scan de OP_RETURN não produz enriquecimento
+    const m = mergeDay(existing, census);
+    expect(m.blocksScanned).toBe(144);   // core do censo vence
+    expect(m.weightTotal).toBe(5);       // enriquecimento preservado
+    expect(m.dieselUg).toBe(0);          // 0 REAL preservado (≠ vazio)
+    expect(m.txAlkRunestone).toBe(7);
+  });
+
+  it('mergeDay: preserva preço BTC real num upgrade de censo (fetch pode ter falhado → 0)', () => {
+    const existing = { ...mk('2026-06-26', 24), blocksScanned: 24, btcUsd: 60000 };
+    const census = { ...mk('2026-06-26', 500), blocksScanned: 144, btcUsd: 0 };
+    expect(mergeDay(existing, census).btcUsd).toBe(60000);
+  });
+
+  it('upsertMerge: parcial não rebaixa dia já cheio e mantém ordenado', () => {
+    let rows = [{ ...mk('2026-06-27', 500), blocksScanned: 155 }];
+    rows = upsertMerge(rows, { ...mk('2026-06-26', 100), blocksScanned: 140 });
+    rows = upsertMerge(rows, { ...mk('2026-06-27', 5), blocksScanned: 5 }); // parcial → não rebaixa
+    expect(rows.map((r) => r.date)).toEqual(['2026-06-26', '2026-06-27']);
+    expect(rows[1].blocksScanned).toBe(155);
   });
 
   it('rollup soma date >= sinceDate e os shares batem', () => {

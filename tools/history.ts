@@ -103,6 +103,40 @@ export function upsert(rows: HistoryRow[], row: HistoryRow): HistoryRow[] {
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+// Colunas de enriquecimento (censo lateral do indexer + o preço BTC). O scan de OP_RETURN NUNCA
+// as produz, então num merge elas são sempre carregadas do lado que já as tem.
+const ENRICH_COLS: (keyof HistoryRow)[] = ['weightTotal', 'weightAlkanes', 'ugMints', 'dieselUg', 'txAlkRunestone', 'txPureRunes'];
+
+/**
+ * Funde duas linhas da MESMA data. As colunas de censo OP_RETURN vêm da linha que escaneou MAIS
+ * blocos: um censo cheio faz UPGRADE de uma amostra, mas uma re-varredura PARCIAL nunca REBAIXA um
+ * dia mais cheio — o cache do GitHub Actions é efêmero, então um run só carrega os blocos que ELE
+ * varreu, e sem esta guarda o upsert truncaria dias já censados (bug dos "dias pela metade").
+ * As colunas de enriquecimento (weight/UG/runestone) e um preço BTC real (>0) são SEMPRE
+ * preservados de quem já os tiver — o scan de OP_RETURN não os regenera.
+ */
+export function mergeDay(existing: HistoryRow, incoming: HistoryRow): HistoryRow {
+  const base = incoming.blocksScanned >= existing.blocksScanned ? incoming : existing;
+  const merged: HistoryRow = { ...base };
+  for (const c of ENRICH_COLS) {
+    const v = (existing[c] as number | undefined) ?? (incoming[c] as number | undefined);
+    if (v === undefined) delete (merged as Record<string, unknown>)[c];
+    else (merged as Record<string, number>)[c] = v;
+  }
+  merged.btcUsd = base.btcUsd || existing.btcUsd || incoming.btcUsd || 0;
+  return merged;
+}
+
+/** upsert de merge: quando a data já existe, funde via mergeDay (não rebaixa dia mais cheio,
+ *  preserva enriquecimento/preço). Usado pelo seed-history no modo --merge. */
+export function upsertMerge(rows: HistoryRow[], row: HistoryRow): HistoryRow[] {
+  const existing = rows.find((r) => r.date === row.date);
+  const merged = existing ? mergeDay(existing, row) : row;
+  const out = rows.filter((r) => r.date !== row.date);
+  out.push(merged);
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export interface Sums {
   blocksScanned: number; totalTx: number; txWithOpReturn: number; txAlkanes: number; opReturnBytes: number; runestoneBytes: number; alkanesBytes: number; dieselMints: number;
   feeTotalSats: number; feeAlkanesSats: number; feeOpReturnSats: number;
