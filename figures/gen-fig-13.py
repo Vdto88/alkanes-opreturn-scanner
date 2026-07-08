@@ -893,7 +893,7 @@ multiline_pct("fig-site-04-four-answers.svg",
 donut("fig-site-05-lastday-donut.svg",
     "Last day — share of OP_RETURN transactions",
     f"On {LAST['date']}, {_ld*100:.1f} percent of Bitcoin OP_RETURN transactions were Alkanes.",
-    f"Last day, share of OP_RETURN transactions ({LAST['date']}, blocks {int(LAST['fromH'])}-{int(LAST['toH'])}, {int(LAST['scanned'])} sampled)",
+    f"Last day, share of OP_RETURN transactions ({LAST['date']}, blocks {int(LAST['fromH'])}-{int(LAST['toH'])})",  # Gabe review: sem "N sampled" no display; metodologia fica no /metrics e na secao honesta
     [("Alkanes",_ld,GREEN),("Other OP_RETURN",1-_ld,CHAR)],
     f"{int(LAST['alkTx']):,} of {int(LAST['opTx']):,} OP_RETURN transactions that day were Alkanes.",
     hole=False)
