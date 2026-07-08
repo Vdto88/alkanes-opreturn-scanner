@@ -34,6 +34,24 @@ jobs:
           SUBFROST_KEY: ${{ secrets.SUBFROST_KEY }}
         run: npx tsx tools/snapshot.ts --blocks 144 --sample 6 --concurrency 16
 
+      # Censo diário: varre TODO bloco recente (sample 1) e re-agrega por timestamp
+      # real via seed-history --merge — o dia de ontem vira censo já nesta manhã,
+      # sem esperar o backfill manual. A janela (últimos ~216 blocos = fromHeight
+      # do snapshot - 72) cobre ontem inteiro com margem; sobreposição com dias já
+      # censados é idempotente. continue-on-error: um denso falho não pode derrubar
+      # o snapshot amostrado que já está no history.csv.
+      - name: Daily census (dense pass, yesterday becomes census)
+        continue-on-error: true
+        env:
+          SUBFROST_KEY: ${{ secrets.SUBFROST_KEY }}
+        run: |
+          ROW=$(tail -1 history.csv)
+          FROM=$(( $(echo "$ROW" | cut -d, -f2) - 72 ))
+          TO=$(echo "$ROW" | cut -d, -f3)
+          echo "census: blocos $FROM..$TO (sample 1)"
+          npx tsx src/cli.ts --from "$FROM" --to "$TO" --sample 1 --concurrency 20
+          npx tsx tools/seed-history.ts cache history.csv --merge
+
       - name: Build report
         run: npx tsx tools/build-report.ts
 
