@@ -54,6 +54,12 @@ jobs:
             npx tsx tools/seed-history.ts cache history.csv
           fi
 
+      # Enriquecimento (weight/UG/runestone) do arquivo lateral do indexer, commitado no repo.
+      - name: Merge enrichment columns (weight/UG/runestone)
+        run: |
+          npx tsx tools/merge-blockspace.ts history.csv blockspace-daily.json
+          npx tsx tools/backfill-runestone-cols.ts history.csv blockspace-daily.json
+
       - name: Build report
         run: npx tsx tools/build-report.ts
 

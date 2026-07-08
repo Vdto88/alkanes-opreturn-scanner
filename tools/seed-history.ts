@@ -75,13 +75,17 @@ let rows = merge ? readHistory(historyPath) : [];
 // rebaixar um dia já censado, e preserva o enriquecimento/preço já presentes.
 for (const r of byDate.values()) rows = merge ? upsertMerge(rows, r) : upsert(rows, r);
 
-// preço BTC/USD por dia (não derruba o build se a API falhar)
+// preço BTC/USD por dia (não derruba o build se a API falhar). O CoinGecko free/demo limita o
+// range a 365 dias — buscar os ~535 dias inteiros fazia a API RECUSAR e os dias novos ficavam
+// btcUsd=0. Busca só a janela recente (≤300d) e PRESERVA os preços já gravados dos dias antigos.
 if (rows.length > 0) {
+  const CAP = 300;
+  const from = rows[Math.max(0, rows.length - CAP)].date;
   try {
-    const prices = await fetchRange(rows[0].date, rows[rows.length - 1].date);
-    for (const r of rows) r.btcUsd = prices[r.date] ?? r.btcUsd ?? 0;
+    const prices = await fetchRange(from, rows[rows.length - 1].date);
+    for (const r of rows) if (prices[r.date] !== undefined) r.btcUsd = prices[r.date];
   } catch (e) {
-    console.error(`preço BTC/USD indisponível, btcUsd fica 0: ${String(e)}`);
+    console.error(`preço BTC/USD indisponível, mantém o existente: ${String(e)}`);
   }
 }
 writeHistory(historyPath, rows);

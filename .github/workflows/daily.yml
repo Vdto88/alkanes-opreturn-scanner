@@ -52,6 +52,14 @@ jobs:
           npx tsx src/cli.ts --from "$FROM" --to "$TO" --sample 1 --concurrency 20
           npx tsx tools/seed-history.ts cache history.csv --merge
 
+      # Enriquecimento (weight/UG/runestone) do arquivo lateral do indexer (censo full-block),
+      # commitado no repo. Idempotente; preenche as colunas que o scan de OP_RETURN não produz.
+      # Sem isto o enriquecimento reatrasa toda vez que o censo cria/reescreve linhas recentes.
+      - name: Merge enrichment columns (weight/UG/runestone)
+        run: |
+          npx tsx tools/merge-blockspace.ts history.csv blockspace-daily.json
+          npx tsx tools/backfill-runestone-cols.ts history.csv blockspace-daily.json
+
       - name: Build report
         run: npx tsx tools/build-report.ts
 
