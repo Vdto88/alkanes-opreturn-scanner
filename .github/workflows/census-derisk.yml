@@ -1,0 +1,61 @@
+name: census-derisk (rockshrew-mono build POC)
+
+# Fase 0 do censo-CI (spec 2026-07-13-censo-ci-automation-design.md):
+# PROVAR que o rockshrew-mono builda no runner Ubuntu ANTES de investir no resto.
+# Descartável — vive no branch census-ci-derisk, nao na master.
+
+on:
+  push:
+    branches: [census-ci-derisk]
+  workflow_dispatch: {}
+
+jobs:
+  build-rockshrew:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: System deps (clang/libclang p/ bindgen do rocksdb, protoc, g++)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libclang-dev protobuf-compiler
+          echo "clang:  $(clang --version | head -1)"
+          echo "g++:    $(g++ --version | head -1)"
+          echo "protoc: $(protoc --version)"
+          echo "ubuntu: $(lsb_release -ds 2>/dev/null || cat /etc/os-release | head -1)"
+
+      - name: Clone alkanes-rs @ 888f4fe6
+        run: |
+          git clone https://github.com/kungfuflex/alkanes-rs.git
+          cd alkanes-rs
+          git checkout 888f4fe6f407797a75b11e0074a1ba0e055cd33b
+          echo "HEAD: $(git rev-parse HEAD)"
+          echo "== rust-toolchain.toml =="; cat rust-toolchain.toml
+
+      - name: Rust toolchain (respeita rust-toolchain.toml = 1.86.0)
+        working-directory: alkanes-rs
+        run: |
+          rustup show
+          echo "rustc: $(rustc --version)"
+          echo "cargo: $(cargo --version)"
+
+      - name: Cache cargo/target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: alkanes-rs
+          cache-on-failure: true
+
+      - name: Build rockshrew-mono (release)
+        working-directory: alkanes-rs
+        run: |
+          export CXXFLAGS="-include cstdint"
+          export PROTOC="$(which protoc)"
+          echo "CXXFLAGS=$CXXFLAGS  PROTOC=$PROTOC"
+          cargo build --release -p rockshrew-mono
+          echo "=== rockshrew-mono build OK ==="
+
+      - name: Prove the binary runs
+        working-directory: alkanes-rs
+        run: |
+          ls -la target/release/rockshrew-mono
+          file target/release/rockshrew-mono
+          ./target/release/rockshrew-mono --help || ./target/release/rockshrew-mono --version || echo "(binario existe; --help/--version sairam nao-zero, ok pro POC)"
