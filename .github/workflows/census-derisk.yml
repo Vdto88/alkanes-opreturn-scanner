@@ -75,8 +75,16 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Clone indexer (privado, branch feat/census-ci-tools, via deploy key)
-        run: git clone -b feat/census-ci-tools git@github.com:Vdto88/alkanes-opreturn-indexer.git indexer
+      - name: Clone indexer (privado, via deploy key) + alkanes-rs (path-deps)
+        run: |
+          git clone -b feat/census-ci-tools git@github.com:Vdto88/alkanes-opreturn-indexer.git indexer
+          git clone https://github.com/kungfuflex/alkanes-rs.git alkanes-rs
+          git -C alkanes-rs checkout 888f4fe6f407797a75b11e0074a1ba0e055cd33b
+
+      - name: Repontar path-deps (C:/refs/alkanes-rs -> ../alkanes-rs clonado)
+        run: |
+          sed -i 's|C:/refs/alkanes-rs|../alkanes-rs|g' indexer/Cargo.toml
+          echo "== path-deps apos sed =="; grep -nE "path *=" indexer/Cargo.toml
 
       - name: Add wasm32 target
         run: rustup target add wasm32-unknown-unknown
