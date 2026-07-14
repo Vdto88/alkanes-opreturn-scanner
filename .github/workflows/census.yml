@@ -6,9 +6,6 @@ name: census (metashrew blockspace)
 # Cron 04:45 UTC (antes do daily.yml 06:17, que faz o merge no history.csv). Sem dispatch do daily.
 
 on:
-  # TEMPORARIO (remover antes de mover pra master): dispara no branch de validacao.
-  push:
-    branches: [census-ci-derisk]
   schedule:
     - cron: '45 4 * * *'
   workflow_dispatch:
@@ -28,7 +25,7 @@ concurrency:
 jobs:
   census:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 240
     steps:
       - name: Checkout scanner
         uses: actions/checkout@v4
@@ -117,8 +114,12 @@ jobs:
           ht(){ curl -s -m 8 -X POST -H 'Content-Type: application/json' -d "$hreq" http://localhost:8085 | grep -oE '[0-9]+' | tail -1; }
           tip(){ curl -s -m 8 -X POST -H 'Content-Type: application/json' -d "$creq" "$CENSUS_RPC_URL" | grep -oE '"result":[0-9]+' | grep -oE '[0-9]+'; }
           # espera ate ft-d alcancar o tip (ou esgotar; ai exporta com o que indexou)
+          # cap dimensionado p/ cold-start: cache de Actions tem escopo por branch, entao a 1a
+          # run na master (pos-merge) nao ve o cache do branch de dev e parte do snapshot+1
+          # (~6.4k blocos ate o tip, ~238 iteracoes @ ~27 blocos/iter). 300 da folga; em regime
+          # permanente o cache incremental deixa so ~1 dia (~144 blocos) pra alcancar.
           MISS=0
-          for i in $(seq 1 200); do
+          for i in $(seq 1 300); do
             if ! kill -0 "$RPID" 2>/dev/null; then echo "!! rockshrew MORREU; log:"; tail -40 rockshrew.log; exit 1; fi
             H=$(ht); H=${H:-0}; T=$(tip)
             echo "  [$i] ft-d=$H tip=${T:-?}"
