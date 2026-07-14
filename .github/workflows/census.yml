@@ -159,6 +159,17 @@ jobs:
       - name: Commit blockspace-daily.json
         if: ${{ github.ref == 'refs/heads/master' && github.event.inputs.dry_run != 'true' }}
         run: |
+          # GUARD anti-regressao: so commita se o novo dataset NAO retrocede o toHeight do ultimo
+          # dia. Se o RPC esgota no meio (ex: cold-start esvazia a cota de CU do provider), o serve
+          # exporta um ft-d atrasado; sem esse guard o cron sobrescreveria o blockspace-daily.json
+          # bom por um regredido e o /metrics perderia semanas. Nesse caso mantem o dataset atual.
+          NEW=$(node -e "const a=require('./blockspace-daily.json');console.log(a[a.length-1].toHeight)")
+          OLD=$(git show HEAD:blockspace-daily.json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const a=JSON.parse(s);console.log(a[a.length-1].toHeight)})")
+          echo "toHeight  novo=$NEW  commitado=$OLD"
+          if [ "${NEW:-0}" -lt "${OLD:-0}" ]; then
+            echo "::warning::census: novo toHeight ($NEW) < commitado ($OLD) -> NAO commita (RPC provavelmente esgotou; dataset atual preservado)"
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add blockspace-daily.json
