@@ -102,21 +102,25 @@ jobs:
         env:
           CENSUS_RPC_URL: ${{ secrets.CENSUS_RPC_URL }}
         run: |
+          set +e +o pipefail   # ht()/tip() dao nao-zero enquanto a porta nao serve; -e mataria o step
           WASM="$PWD/indexer/target/wasm32-unknown-unknown/release/opreturn_indexer.wasm"
+          echo "== sanity: binarios =="; ls -la "$HOME/rockshrew-mono" "$WASM" || { echo "binario/WASM faltando"; exit 1; }
           # rockshrew-mono le a porta da env PORT (mesmo mecanismo do refresh-blockspace-fy.sh).
           PORT=8085 "$HOME/rockshrew-mono" \
             --daemon-rpc-url "$CENSUS_RPC_URL" --indexer "$WASM" \
             --db-path db-ft-d --start-block 951535 \
             --pipeline-size 8 --max-reorg-depth 6 > rockshrew.log 2>&1 &
-          echo $! > rockshrew.pid
+          RPID=$!; echo $RPID > rockshrew.pid
+          sleep 12   # da tempo do rockshrew subir e comecar a servir a porta
           hreq='{"jsonrpc":"2.0","id":0,"method":"metashrew_height","params":[]}'
           creq='{"jsonrpc":"2.0","id":0,"method":"getblockcount","params":[]}'
           ht(){ curl -s -m 8 -X POST -H 'Content-Type: application/json' -d "$hreq" http://localhost:8085 | grep -oE '[0-9]+' | tail -1; }
           tip(){ curl -s -m 8 -X POST -H 'Content-Type: application/json' -d "$creq" "$CENSUS_RPC_URL" | grep -oE '"result":[0-9]+' | grep -oE '[0-9]+'; }
           # espera ate ft-d alcancar o tip (ou esgotar; ai exporta com o que indexou)
           for i in $(seq 1 150); do
+            if ! kill -0 "$RPID" 2>/dev/null; then echo "!! rockshrew MORREU; log:"; tail -40 rockshrew.log; exit 1; fi
             H=$(ht); H=${H:-0}; T=$(tip)
-            echo "  ft-d=$H tip=${T:-?}"
+            echo "  [$i] ft-d=$H tip=${T:-?}"
             [ -z "$T" ] && { echo "tip indisponivel -> exporto com ft-d=$H"; break; }
             [ "$H" -ge "$((T-2))" ] && { echo "caught up (ft-d=$H tip=$T)"; break; }
             sleep 20
