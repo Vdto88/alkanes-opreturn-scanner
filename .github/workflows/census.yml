@@ -44,7 +44,7 @@ jobs:
 
       - name: Clone indexer (privado) + alkanes-rs @ 888f4fe6 (path-deps + rockshrew)
         run: |
-          git clone -b feat/census-ci-tools git@github.com:Vdto88/alkanes-opreturn-indexer.git indexer
+          git clone -b feat/part1-indexer git@github.com:Vdto88/alkanes-opreturn-indexer.git indexer
           git clone https://github.com/kungfuflex/alkanes-rs.git alkanes-rs
           git -C alkanes-rs checkout 888f4fe6f407797a75b11e0074a1ba0e055cd33b
 
