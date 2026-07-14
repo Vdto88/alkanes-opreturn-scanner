@@ -1,0 +1,167 @@
+name: census (metashrew blockspace)
+
+# Gera o censo (weight/UG/runestone) do blockspace-daily.json no CI 24/7 (spec/plano de
+# 2026-07-13). Concatena o snapshot historico congelado (880000-951534, arquivo no indexer)
+# com o ft-d vivo (951535->tip, RocksDB no actions/cache) e roda o export-blockspace.ts.
+# Cron 04:45 UTC (antes do daily.yml 06:17, que faz o merge no history.csv). Sem dispatch do daily.
+
+on:
+  schedule:
+    - cron: '45 4 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'So valida o pipeline (NAO commita o blockspace-daily.json)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: census
+  cancel-in-progress: false
+
+jobs:
+  census:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - name: Checkout scanner
+        uses: actions/checkout@v4
+
+      - name: System deps (clang/libclang p rockshrew, protoc p WASM)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libclang-dev protobuf-compiler
+
+      - name: SSH deploy key (indexer privado)
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          echo "${{ secrets.INDEXER_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Clone indexer (privado) + alkanes-rs @ 888f4fe6 (path-deps + rockshrew)
+        run: |
+          git clone -b feat/part1-indexer git@github.com:Vdto88/alkanes-opreturn-indexer.git indexer
+          git clone https://github.com/kungfuflex/alkanes-rs.git alkanes-rs
+          git -C alkanes-rs checkout 888f4fe6f407797a75b11e0074a1ba0e055cd33b
+
+      - name: Repontar path-deps do indexer (C:/refs/alkanes-rs -> ../alkanes-rs)
+        run: |
+          sed -i 's|C:/refs/alkanes-rs|../alkanes-rs|g' indexer/Cargo.toml
+          echo "== path-deps =="; grep -nE "path *=" indexer/Cargo.toml
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install indexer deps (tsx)
+        run: npm --prefix indexer install --no-audit --no-fund
+
+      - name: Rust wasm32 target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Cache rust builds (rockshrew + wasm)
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            alkanes-rs
+            indexer
+          cache-on-failure: true
+
+      - name: Build rockshrew-mono
+        working-directory: alkanes-rs
+        run: |
+          export CXXFLAGS="-include cstdint"
+          export PROTOC="$(which protoc)"
+          cargo build --release -p rockshrew-mono
+          cp target/release/rockshrew-mono "$HOME/rockshrew-mono"
+
+      - name: Build WASM (opreturn_indexer.wasm)
+        working-directory: indexer
+        run: |
+          export PROTOC="$(which protoc)"
+          cargo build --release --target wasm32-unknown-unknown
+          ls -la target/wasm32-unknown-unknown/release/opreturn_indexer.wasm
+
+      - name: Restore db-ft-d cache
+        uses: actions/cache/restore@v4
+        with:
+          path: db-ft-d
+          key: db-ft-d-${{ github.run_id }}
+          restore-keys: db-ft-d-
+
+      - name: Serve ft-d + estender ao tip
+        id: serve
+        env:
+          CENSUS_RPC_URL: ${{ secrets.CENSUS_RPC_URL }}
+        run: |
+          set +e +o pipefail   # ht()/tip() dao nao-zero enquanto a porta nao serve; -e mataria o step
+          WASM="$PWD/indexer/target/wasm32-unknown-unknown/release/opreturn_indexer.wasm"
+          echo "== sanity: binarios =="; ls -la "$HOME/rockshrew-mono" "$WASM" || { echo "binario/WASM faltando"; exit 1; }
+          # rockshrew-mono le a porta da env PORT (mesmo mecanismo do refresh-blockspace-fy.sh).
+          PORT=8085 RUST_LOG=warn "$HOME/rockshrew-mono" \
+            --daemon-rpc-url "$CENSUS_RPC_URL" --indexer "$WASM" \
+            --db-path db-ft-d --start-block 951535 \
+            --pipeline-size 8 --max-reorg-depth 6 > rockshrew.log 2>&1 &
+          RPID=$!; echo $RPID > rockshrew.pid
+          sleep 12   # da tempo do rockshrew subir e comecar a servir a porta
+          hreq='{"jsonrpc":"2.0","id":0,"method":"metashrew_height","params":[]}'
+          creq='{"jsonrpc":"2.0","id":0,"method":"getblockcount","params":[]}'
+          ht(){ curl -s -m 8 -X POST -H 'Content-Type: application/json' -d "$hreq" http://localhost:8085 | grep -oE '[0-9]+' | tail -1; }
+          tip(){ curl -s -m 8 -X POST -H 'Content-Type: application/json' -d "$creq" "$CENSUS_RPC_URL" | grep -oE '"result":[0-9]+' | grep -oE '[0-9]+'; }
+          # espera ate ft-d alcancar o tip (ou esgotar; ai exporta com o que indexou)
+          # cap dimensionado p/ cold-start: cache de Actions tem escopo por branch, entao a 1a
+          # run na master (pos-merge) nao ve o cache do branch de dev e parte do snapshot+1
+          # (~6.4k blocos ate o tip, ~238 iteracoes @ ~27 blocos/iter). 300 da folga; em regime
+          # permanente o cache incremental deixa so ~1 dia (~144 blocos) pra alcancar.
+          MISS=0
+          for i in $(seq 1 300); do
+            if ! kill -0 "$RPID" 2>/dev/null; then echo "!! rockshrew MORREU; log:"; tail -40 rockshrew.log; exit 1; fi
+            H=$(ht); H=${H:-0}; T=$(tip)
+            echo "  [$i] ft-d=$H tip=${T:-?}"
+            if [ -z "$T" ]; then
+              MISS=$((MISS+1))
+              [ "$MISS" -ge 8 ] && { echo "tip indisponivel ${MISS}x -> exporto com ft-d=$H"; break; }
+              sleep 8; continue
+            fi
+            MISS=0
+            [ "$H" -ge "$((T-2))" ] && { echo "caught up (ft-d=$H tip=$T)"; break; }
+            sleep 20
+          done
+          DHI=$(ht); DHI=${DHI:-951535}
+          echo "dhi=$DHI" >> "$GITHUB_OUTPUT"
+          echo "== DHI=$DHI; ultimas linhas do rockshrew.log =="; tail -6 rockshrew.log || true
+
+      - name: Export blockspace-daily.json ([snapshot + ft-d])
+        run: |
+          npx --prefix indexer tsx indexer/tools/export-blockspace.ts blockspace-daily.json \
+            file:indexer/data/blockspace-snapshot-880000-951534.json.gz 880000 951534 \
+            http://localhost:8085 951535 ${{ steps.serve.outputs.dhi }}
+          node -e "const d=require('./blockspace-daily.json'); console.log('OK dias:',d.length,'| primeiro:',d[0].date,'| ultimo:',d[d.length-1].date,'| ultimo toHeight:',d[d.length-1].toHeight)"
+
+      - name: Kill rockshrew (antes de salvar o cache)
+        if: always()
+        run: |
+          [ -f rockshrew.pid ] && kill "$(cat rockshrew.pid)" 2>/dev/null || true
+          for i in $(seq 1 15); do pgrep -x rockshrew-mono >/dev/null || break; sleep 2; done
+
+      - name: Save db-ft-d cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: db-ft-d
+          key: db-ft-d-${{ github.run_id }}
+
+      - name: Commit blockspace-daily.json
+        if: ${{ github.ref == 'refs/heads/master' && github.event.inputs.dry_run != 'true' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add blockspace-daily.json
+          git pull --rebase --autostash origin master || true
+          git diff --cached --quiet || git commit -m "chore(census): blockspace-daily $(date -u +%Y-%m-%d)"
+          git push
