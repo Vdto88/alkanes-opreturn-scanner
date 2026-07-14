@@ -59,3 +59,38 @@ jobs:
           ls -la target/release/rockshrew-mono
           file target/release/rockshrew-mono
           ./target/release/rockshrew-mono --help || ./target/release/rockshrew-mono --version || echo "(binario existe; --help/--version sairam nao-zero, ok pro POC)"
+
+  # Derisk #2: build do WASM do indexer (privado) no runner + clone via deploy key.
+  build-wasm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: System deps (protoc p/ metashrew-* via protobuf)
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Setup SSH deploy key (indexer privado)
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          echo "${{ secrets.INDEXER_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Clone indexer (privado, branch feat/census-ci-tools, via deploy key)
+        run: git clone -b feat/census-ci-tools git@github.com:Vdto88/alkanes-opreturn-indexer.git indexer
+
+      - name: Add wasm32 target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Cache cargo/target (indexer)
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: indexer
+          cache-on-failure: true
+
+      - name: Build WASM
+        working-directory: indexer
+        run: |
+          export PROTOC="$(which protoc)"
+          cargo build --release --target wasm32-unknown-unknown
+          ls -la target/wasm32-unknown-unknown/release/opreturn_indexer.wasm
+          echo "=== WASM build OK ==="
