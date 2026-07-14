@@ -6,6 +6,9 @@ name: census (metashrew blockspace)
 # Cron 04:45 UTC (antes do daily.yml 06:17, que faz o merge no history.csv). Sem dispatch do daily.
 
 on:
+  # TEMPORARIO (remover antes de mover pra master): dispara no branch de validacao.
+  push:
+    branches: [census-ci-derisk]
   schedule:
     - cron: '45 4 * * *'
   workflow_dispatch:
