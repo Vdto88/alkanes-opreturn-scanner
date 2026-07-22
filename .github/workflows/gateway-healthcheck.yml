@@ -1,0 +1,64 @@
+name: gateway healthcheck
+
+# Responde UMA pergunta em ~1 minuto: a SUBFROST_KEY do gateway
+# mainnet.subfrost.io ainda é aceita?
+#
+# Existe porque o sinal normal é enganoso. `scanRange` pula bloco que falha e
+# continua o range (é design), então o CLI sai com exit 0 mesmo varrendo ZERO
+# blocos: em 2026-07-22 a run 29953812870 marcou o passo `Dense scan` como
+# SUCCESS depois de 30 minutos e 386 falhas seguidas de "Invalid or inactive
+# API key". Quem olhasse o ✓ concluiria que o gateway voltou.
+#
+# Aqui o teste é 1 bloco e a asserção é sobre a COBERTURA, não sobre o exit
+# code: o passo falha se o scanner não conseguiu varrer o bloco. Não escreve
+# em history.csv, não commita e não publica no Pages, então pode rodar a
+# qualquer momento, inclusive junto do daily.yml.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [chore/gateway-healthcheck]
+
+jobs:
+  healthcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout scanner
+        uses: actions/checkout@v4
+
+      - name: Clone decoder (sibling público)
+        run: git clone --depth 1 https://github.com/Vdto88/alkanes-opreturn-decoder.git ../opreturn-decoder
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: npm install --no-audit --no-fund
+
+      - name: Scan a single block through the gateway
+        env:
+          SUBFROST_KEY: ${{ secrets.SUBFROST_KEY }}
+        run: |
+          set -o pipefail
+          TIP=$(curl -sf --max-time 20 https://mempool.space/api/blocks/tip/height)
+          echo "tip=$TIP (via mempool, só pra escolher um bloco recente)"
+          # --no-cache: nada de cache/ no runner, então nem por acidente este job
+          # alimenta um seed-history posterior.
+          npx tsx src/cli.ts --from "$TIP" --to "$TIP" --sample 1 --source subfrost --no-cache 2>&1 | tee scan.log
+
+          # A linha de cobertura é a única prova confiável. "(0 blocos)" = fonte
+          # morta, independente do exit code do CLI. O separador de alturas é um
+          # travessão, não hífen, e o sufixo ", amostra 1/N" só aparece quando
+          # sampled — por isso o recorte é pelo "(N blocos", sem depender dos dois.
+          COVERAGE=$(grep 'Cobertura: blocos' scan.log | grep -oE '\([0-9]+ blocos' | grep -oE '[0-9]+')
+          echo "blocos varridos: ${COVERAGE:-desconhecido}"
+
+          if [ "${COVERAGE:-0}" -lt 1 ]; then
+            echo "::error::gateway RECUSANDO: 0 blocos varridos. Motivo abaixo."
+            grep -oE 'falhou, pulando: .*' scan.log | head -1
+            exit 1
+          fi
+          echo "gateway OK: a SUBFROST_KEY é aceita e o bloco $TIP foi varrido."
