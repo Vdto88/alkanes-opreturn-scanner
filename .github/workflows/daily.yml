@@ -8,26 +8,28 @@ on:
 permissions:
   contents: write           # pra commitar history.csv + report.html de volta
 
-# Fonte esplora usada pelos dois passos de varredura. O default era `subfrost`
-# (gateway mainnet.subfrost.io/v4/<key>), que em 2026-07-20 passou a responder
-# "Invalid or inactive API key" — a assinatura por trás do secret SUBFROST_KEY
-# venceu. Como o snapshot é o PRIMEIRO passo que toca a rede, os 6 passos
-# seguintes ficavam `skipped` e o history.csv parou de ser publicado (o site
-# congelou em 2026-07-20) sem que nada avisasse: o census.yml usa outro
-# endpoint (PublicNode, sem chave) e seguiu verde, mascarando a falha.
+# Fonte esplora usada pelos dois passos de varredura.
 #
-# `mempool` é a Esplora pública do mempool.space, sem chave e sem cota. Foi
-# verificada contra os 4 endpoints que o scanner usa (/blocks/tip/height,
-# /block-height/<h>, /block/<hash>, /block/<hash>/txs/<i>) e, mais importante,
-# por equivalência: varrendo os MESMOS blocos que o gateway já tinha varrido
-# (958700-958703, dentro do dia 2026-07-19), deu 84.51% de tx com OP_RETURN
-# contra 76.70% da média do dia inteiro no history.csv — mesma ordem de
-# grandeza, diferença explicada por variância entre blocos, decode-fail=0.
+# Volta pra `subfrost` (gateway mainnet.subfrost.io/v4/<key>). A chave de
+# servico existe e e literalmente `subfrost`: o secret SUBFROST_KEY guardava a
+# assinatura PESSOAL que venceu, e o gateway passou a responder "Invalid or
+# inactive API key" a partir de 2026-07-21 08:42 UTC (ultima chamada boa
+# 07-20 09:32). Os 4 metodos que o scanner usa foram testados contra a chave
+# nova antes deste commit -- esplora_blocks:tip:height, esplora_block-height:<h>,
+# esplora_block:<hash> e esplora_block:<hash>:txs:<i> -- e o ultimo devolve o
+# campo `fee`, que e justamente o que o censo metashrew nao produz.
 #
-# Trocar de volta pra `subfrost` é editar esta linha, assim que existir uma
-# chave de serviço (da SUBFROST, não a assinatura pessoal de alguém).
+# O `mempool` foi o stopgap dos dois dias congelados e NAO serve pra varredura
+# sustentada. Medido na run 29948501062 (o unico ciclo completo que rodou nele):
+# 207 dos 216 blocos do censo denso falharam com `TypeError: fetch failed`, o
+# workflow ficou VERDE porque scanRange pula bloco falho e continua o range, e
+# o history.csv foi publicado com 2026-07-21 valendo 9 blocos de um dia que
+# teve 138. Ele aguenta spot-check de poucos blocos; nao aguenta um censo.
+#
+# Antes de confiar num check verde deste pipeline, rode o gateway-healthcheck:
+# ele assere sobre a linha `Cobertura: ... (N blocos)`, nao sobre o exit code.
 env:
-  SCAN_SOURCE: mempool
+  SCAN_SOURCE: subfrost
 
 jobs:
   snapshot:
