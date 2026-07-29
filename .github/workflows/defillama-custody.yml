@@ -29,11 +29,6 @@ on:
     # público entra em fila e atrasa ~2h — irrelevante pra uma checagem diária.
     - cron: '23 7 * * *'
   workflow_dispatch: {}
-  # Mesmo padrão do gateway-healthcheck.yml: dispara por push no branch de
-  # trabalho, porque workflow_dispatch só existe depois que o arquivo está na
-  # default branch — sem isto não dá pra provar que o job roda ANTES do merge.
-  push:
-    branches: [feat/defillama-custody-monitor]
 
 permissions:
   contents: read
