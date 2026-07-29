@@ -1,0 +1,89 @@
+name: defillama custody monitor
+
+# Responde UMA pergunta por dia: os dois endereços de custódia do frBTC que o
+# adapter do DefiLlama lista ainda são os endereços vivos?
+#
+# Existe porque DefiLlama-Adapters#20263 fixa os endereços como constante em
+# projects/helper/bitcoin-book/index.js, e justifica isso ao reviewer dizendo,
+# por escrito, que a derivação on-chain "fica do nosso lado". Este job É esse
+# lado. Sem ele o compromisso é vazio: se o signer set rotacionar e ninguém
+# abrir PR de update no mesmo dia, o gráfico público de TVL cai a zero sem
+# aviso nenhum.
+#
+# O script deriva o endereço Alkanes de ponta a ponta a partir do Bitcoin L1
+# (frBTC [32:0] opcode 103 GET_SIGNER -> tweak BIP341 -> bech32m) e compara com
+# o listado. O endereço BRC2.0 não é derivável assim, então o sinal disponível
+# é o saldo colapsar.
+#
+# O script se autovalida contra vetor conhecido do BIP341 ANTES de emitir
+# qualquer veredito, então bug na cripto artesanal falha alto em vez de
+# reportar "sem rotação" pra sempre.
+#
+# Não escreve em history.csv, não commita e não publica no Pages. Pode rodar a
+# qualquer momento, inclusive junto do daily.yml.
+
+on:
+  schedule:
+    # 07:23 UTC. Fora dos minutos :00/:30 de propósito, e depois do census
+    # (04:45) e do daily (06:17) pra não disputar runner com eles. Cron de repo
+    # público entra em fila e atrasa ~2h — irrelevante pra uma checagem diária.
+    - cron: '23 7 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: defillama-custody
+  cancel-in-progress: false
+
+jobs:
+  custody:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Sem `pip install`: o monitor usa só a stdlib de propósito, justamente
+      # pra que a checagem não possa quebrar por dependência.
+      - name: Check custody addresses
+        run: |
+          set +e
+          python tools/defillama-custody-monitor.py
+          CODE=$?
+          set -e
+
+          if [ "$CODE" -eq 0 ]; then
+            echo "custody OK: os dois endereços batem com o que o adapter lista."
+            exit 0
+          fi
+
+          if [ "$CODE" -eq 1 ]; then
+            echo "::error::ROTAÇÃO DE CUSTÓDIA. O adapter do DefiLlama está desatualizado — abrir PR de update HOJE em DefiLlama/DefiLlama-Adapters (projects/helper/bitcoin-book/index.js). O gráfico público lê o endereço listado."
+            exit 1
+          fi
+
+          # exit 2 = não deu pra checar (RPC fora, resposta estranha). Isso NÃO
+          # é all-clear, então tenta de novo uma vez antes de gritar: um 5xx
+          # transitório do gateway não deve virar alarme falso diário, mas duas
+          # falhas seguidas significam que a checagem está cega — que é
+          # exatamente o estado contra o qual este job existe.
+          echo "primeira tentativa não conclusiva (exit 2); repetindo em 60s"
+          sleep 60
+
+          set +e
+          python tools/defillama-custody-monitor.py
+          CODE=$?
+          set -e
+
+          case "$CODE" in
+            0) echo "custody OK na segunda tentativa."; exit 0 ;;
+            1) echo "::error::ROTAÇÃO DE CUSTÓDIA (confirmada na segunda tentativa). Abrir PR de update HOJE."; exit 1 ;;
+            *) echo "::error::MONITOR CEGO: duas tentativas seguidas não conseguiram checar a custódia. Isto não é all-clear — a rotação passaria despercebida enquanto durar."; exit 1 ;;
+          esac
