@@ -58,7 +58,7 @@ jobs:
 
           if [ "${COVERAGE:-0}" -lt 1 ]; then
             echo "::error::gateway RECUSANDO: 0 blocos varridos. Motivo abaixo."
-            grep -oE 'falhou, pulando: .*' scan.log | head -1
+            grep -oE 'failed, skipping: .*' scan.log | head -1
             exit 1
           fi
           echo "gateway OK: a SUBFROST_KEY é aceita e o bloco $TIP foi varrido."

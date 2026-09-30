@@ -42,7 +42,7 @@ jobs:
           # (and the db-ft-d it writes to) until this line is bumped on purpose.
           # alkanes-rs is cloned separately only to build rockshrew-mono at the same commit.
           git clone https://github.com/Vdto88/alkanes-opreturn-indexer.git indexer
-          git -C indexer checkout 14388404e9fe06900bf611e0e468dc132e0ec0f4
+          git -C indexer checkout 778f94b26331b2efaa0833f628498b83a7989633
           git clone https://github.com/kungfuflex/alkanes-rs.git alkanes-rs
           git -C alkanes-rs checkout 888f4fe6f407797a75b11e0074a1ba0e055cd33b
 

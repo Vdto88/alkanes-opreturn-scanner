@@ -36,7 +36,7 @@ npm run scan -- --sample 100 --from 946000 --to 954000  # sample 1 block in 100
 npm run scan -- --source mempool --from 954800 --to 954849  # mempool.space, no key
 ```
 
-Flags: `--blocks N` · `--from/--to H` · `--source subfrost|mempool|alkanode` (default subfrost) ·
+Flags: `--blocks N` · `--from/--to H` · `--source subfrost|mempool|alkanode` (default subfrost; `alkanode` no longer answers, its API returns an HTML page) ·
 `--subfrost-key K` · `--sample K` · `--no-cache` · `--cache-dir D` · `--concurrency N`.
 
 ### Daily history + chart
