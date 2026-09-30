@@ -27,7 +27,7 @@ permissions:
 # teve 138. Ele aguenta spot-check de poucos blocos; nao aguenta um censo.
 #
 # Antes de confiar num check verde deste pipeline, rode o gateway-healthcheck:
-# ele assere sobre a linha `Cobertura: ... (N blocos)`, nao sobre o exit code.
+# ele assere sobre a linha `Coverage: ... (N blocks)`, nao sobre o exit code.
 env:
   SCAN_SOURCE: subfrost
 

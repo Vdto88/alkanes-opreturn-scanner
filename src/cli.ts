@@ -60,9 +60,9 @@ async function main(): Promise<void> {
     from = tip - (o.blocks ?? 50) + 1;
   }
 
-  console.error(`Varrendo blocos ${from}..${to} via ${o.source}${o.sampleEvery > 1 ? ` (amostra 1/${o.sampleEvery})` : ''}...`);
+  console.error(`Scanning blocks ${from}..${to} via ${o.source}${o.sampleEvery > 1 ? ` (sample 1/${o.sampleEvery})` : ''}...`);
   const result = await scanRange(from, to, { ...esploraOpts, sampleEvery: o.sampleEvery, useCache: o.useCache, cacheDir: o.cacheDir });
-  if (result.blocksFailed > 0) console.error(`aviso: ${result.blocksFailed} bloco(s) pulado(s) por erro de fetch (após retries)`);
+  if (result.blocksFailed > 0) console.error(`warning: ${result.blocksFailed} block(s) skipped after fetch errors (retries exhausted); the totals above do not include them`);
   const metrics = computeMetrics(result.aggregate);
   console.log(formatReport(result, metrics));
 }

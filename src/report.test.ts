@@ -23,7 +23,7 @@ describe('formatReport', () => {
     expect(s).toContain('20.00%');  // OP_RETURN share
     expect(s).toContain('91.00%');  // Alkanes do OP_RETURN por bytes
     expect(s).toContain('8.00%');   // tx = Alkanes
-    expect(s).toContain('blocos 100–149');
+    expect(s).toContain('blocks 100–149');
     expect(s).toContain('coinbase'); // ressalva presente
   });
 });

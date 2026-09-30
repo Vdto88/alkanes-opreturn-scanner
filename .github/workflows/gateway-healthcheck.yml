@@ -49,11 +49,11 @@ jobs:
           # alimenta um seed-history posterior.
           npx tsx src/cli.ts --from "$TIP" --to "$TIP" --sample 1 --source subfrost --no-cache 2>&1 | tee scan.log
 
-          # A linha de cobertura é a única prova confiável. "(0 blocos)" = fonte
-          # morta, independente do exit code do CLI. O separador de alturas é um
-          # travessão, não hífen, e o sufixo ", amostra 1/N" só aparece quando
-          # sampled — por isso o recorte é pelo "(N blocos", sem depender dos dois.
-          COVERAGE=$(grep 'Cobertura: blocos' scan.log | grep -oE '\([0-9]+ blocos' | grep -oE '[0-9]+')
+          # The coverage line is the only reliable proof. "(0 blocks)" = dead
+          # source, whatever the CLI exit code. The height separator is an en dash,
+          # not a hyphen, and the ", sample 1/N" suffix only appears when sampled,
+          # so the match is on "(N blocks", independent of both.
+          COVERAGE=$(grep 'Coverage: blocks' scan.log | grep -oE '\([0-9]+ blocks' | grep -oE '[0-9]+')
           echo "blocos varridos: ${COVERAGE:-desconhecido}"
 
           if [ "${COVERAGE:-0}" -lt 1 ]; then

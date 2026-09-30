@@ -106,7 +106,7 @@ export async function scanRange(fromHeight: number, toHeight: number, opts: Scan
       // 1 bloco falho (após os retries do esplora) não pode descartar horas de scan;
       // como é amostrado, pular um bloco é estatisticamente irrelevante.
       blocksFailed += 1;
-      console.error(`bloco ${h} falhou, pulando: ${String(e)}`);
+      console.error(`block ${h} failed, skipping: ${String(e)}`);
     }
   }
 
