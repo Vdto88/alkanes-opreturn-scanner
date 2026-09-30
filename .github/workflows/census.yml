@@ -35,23 +35,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang libclang-dev protobuf-compiler
 
-      - name: SSH deploy key (indexer privado)
+      - name: Clone indexer + alkanes-rs @ 888f4fe6 (rockshrew)
         run: |
-          mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          echo "${{ secrets.INDEXER_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
-
-      - name: Clone indexer (privado) + alkanes-rs @ 888f4fe6 (path-deps + rockshrew)
-        run: |
-          git clone -b feat/part1-indexer git@github.com:Vdto88/alkanes-opreturn-indexer.git indexer
+          # The indexer is public and pins alkanes-rs 888f4fe6 as git deps in its Cargo.toml.
+          # alkanes-rs is cloned separately only to build rockshrew-mono at the same commit.
+          git clone https://github.com/Vdto88/alkanes-opreturn-indexer.git indexer
           git clone https://github.com/kungfuflex/alkanes-rs.git alkanes-rs
           git -C alkanes-rs checkout 888f4fe6f407797a75b11e0074a1ba0e055cd33b
-
-      - name: Repontar path-deps do indexer (C:/refs/alkanes-rs -> ../alkanes-rs)
-        run: |
-          sed -i 's|C:/refs/alkanes-rs|../alkanes-rs|g' indexer/Cargo.toml
-          echo "== path-deps =="; grep -nE "path *=" indexer/Cargo.toml
 
       - name: Setup Node
         uses: actions/setup-node@v4

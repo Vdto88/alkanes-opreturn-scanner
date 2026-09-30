@@ -91,6 +91,7 @@ jobs:
           mkdir -p public
           cp report.html public/index.html
           cp history.csv public/history.csv
+          cp LICENSE public/LICENSE
           mkdir -p public/figures
           cp figures/gen-fig-13.py figures/README.md public/figures/
           cat > public/README.md <<'READMEEOF'
@@ -100,10 +101,16 @@ jobs:
           The same charts, live on the site: **https://subfrost.io/metrics**
 
           Alkanes' share of Bitcoin OP_RETURN, updated daily. `history.csv` holds one
-          row per day. Built by the open-source (MIT) `alkanes-opreturn-scanner`, which
-          reuses `alkanes-opreturn-decoder` to classify each transaction
-          (protocol_tag = 1). `figures/gen-fig-13.py` re-renders every article chart
-          from `history.csv` (Python 3, stdlib only).
+          row per UTC day since block 880,000. Built by the open-source (MIT)
+          `alkanes-opreturn-scanner`, which reuses `alkanes-opreturn-decoder` to classify
+          each transaction (protocol_tag = 1); the weight, UNCOMMON•GOODS and Runestone
+          columns come from the metashrew census in `alkanes-opreturn-indexer`.
+          `figures/gen-fig-13.py` re-renders every article chart from `history.csv`
+          (Python 3, stdlib only).
+
+          - https://github.com/Vdto88/alkanes-opreturn-decoder
+          - https://github.com/Vdto88/alkanes-opreturn-scanner
+          - https://github.com/Vdto88/alkanes-opreturn-indexer
           READMEEOF
 
       - name: Publish to public Pages repo
